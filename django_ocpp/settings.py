@@ -41,7 +41,7 @@ INSTALLED_APPS = [
     'django_otp',
     'push_notifications',
     'django_otp.plugins.otp_totp',
-    'ocpp_app',
+    # 'ocpp_app',
 ]
 
 MIDDLEWARE = [

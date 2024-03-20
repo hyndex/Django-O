@@ -1,7 +1,6 @@
 # ocpp_app/message_handlers/handle_heartbeat.py
-from django.utils.timezone import now
 from ocpp_app.models import Charger
 
-def handle_heartbeat(payload):
-    # In a real implementation, you would update the last heartbeat timestamp for the charger
+def handle_heartbeat(payload, charger_id):
+    Charger.objects.filter(charger_id=charger_id).update(last_heartbeat=now())
     return {"currentTime": now().isoformat()}

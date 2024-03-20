@@ -34,19 +34,19 @@ class PaymentInfo(models.Model):
     status = models.CharField(max_length=50)
 
 
-# Order Model
-class Order(models.Model):
+# SessionBilling Model
+class SessionBilling(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    customer = models.ForeignKey(User, on_delete=models.CASCADE, related_name='orders')
-    amount = models.FloatField()
-    tax = models.FloatField()
-    gateway_id = models.CharField(max_length=255, blank=True, null=True)
-    gateway_name = models.CharField(max_length=255, blank=True, null=True)
-    order_serial = models.IntegerField(blank=True, null=True)
-    type = models.CharField(max_length=50)
-    limit_type = models.CharField(max_length=50, blank=True, null=True)
-    property = models.JSONField(blank=True, null=True)  # JSON stored as text
-    status = models.CharField(max_length=50)
+    session = models.ForeignKey('ChargingSession', on_delete=models.CASCADE, related_name='billings')
+    amount_added = models.FloatField()
+    amount_consumed = models.FloatField()
+    amount_refunded = models.FloatField()
+    time_added = models.FloatField()
+    time_consumed = models.FloatField()
+    time_refunded = models.FloatField()
+    kwh_added = models.FloatField()
+    kwh_consumed = models.FloatField()
+    kwh_refunded = models.FloatField()
 
 
 # Charging Plan Model
@@ -106,11 +106,12 @@ class Promotion(models.Model):
     is_active = models.BooleanField(default=True)
     readonly = models.BooleanField(default=False)
 
-# PushNotification Model
-class PushNotification(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    token = models.CharField(max_length=255, unique=True)
-    device_type = models.CharField(max_length=10, choices=[('ANDROID', 'Android'), ('IOS', 'iOS')], default='ANDROID')
+
+class Device(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    token = models.CharField(max_length=255)
+    device_type = models.CharField(max_length=10, choices=[('ANDROID', 'Android'), ('IOS', 'iOS')])
+
 
 # Role Model
 class Role(models.Model):
@@ -128,19 +129,7 @@ class RolePermission(models.Model):
     class Meta:
         unique_together = ('role', 'module', 'permission')
 
-# SessionBilling Model
-class SessionBilling(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    session = models.ForeignKey('ChargingSession', on_delete=models.CASCADE, related_name='billings')
-    amount_added = models.FloatField()
-    amount_consumed = models.FloatField()
-    amount_refunded = models.FloatField()
-    time_added = models.FloatField()
-    time_consumed = models.FloatField()
-    time_refunded = models.FloatField()
-    kwh_added = models.FloatField()
-    kwh_consumed = models.FloatField()
-    kwh_refunded = models.FloatField()
+
 
 # TaxTemplate Model
 class TaxTemplate(models.Model):
@@ -154,7 +143,7 @@ class TaxTemplate(models.Model):
 class Wallet(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='wallets')
-    amount = models.FloatField()
+    amount = models.FloatField() # positive in case of deposit and negative in case of deduction
     start_balance = models.FloatField()
     end_balance = models.FloatField()
     reason = models.CharField(max_length=255, choices=[
@@ -170,3 +159,20 @@ class Wallet(models.Model):
     ])
 
 
+
+# Order Model
+class Order(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='orders')
+    payment_info = models.OneToOneField(PaymentInfo, on_delete=models.CASCADE, related_name='order', null=True, blank=True)
+    session_billing = models.ForeignKey(SessionBilling, on_delete=models.CASCADE, related_name='orders', null=True, blank=True)
+    wallet = models.ForeignKey(Wallet, on_delete=models.CASCADE, related_name='orders', null=True, blank=True)
+    amount = models.FloatField()
+    tax = models.FloatField()
+    gateway_id = models.CharField(max_length=255, blank=True, null=True)
+    gateway_name = models.CharField(max_length=255, blank=True, null=True)
+    order_serial = models.IntegerField(blank=True, null=True)
+    type = models.CharField(max_length=50)
+    limit_type = models.CharField(max_length=50, blank=True, null=True)
+    property = models.JSONField(blank=True, null=True)  # JSON stored as text
+    status = models.CharField(max_length=50)

@@ -1,0 +1,15 @@
+image:
+  file: .gitpod.Dockerfile
+
+tasks:
+  - name: Setup
+    init: |
+      pip install -r requirements.txt
+      python manage.py migrate
+      python manage.py collectstatic --noinput
+    command: |
+      python manage.py runserver 0.0.0.0:8000
+
+ports:
+  - port: 8000
+    onOpen: open-preview

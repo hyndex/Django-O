@@ -1,16 +1,9 @@
-# remote_stop_transaction.py
-from ocpp_app.models import ChargingSession
-from django.utils.timezone import now
+# ocpp_app/message_handlers/cs_remote_stop_transaction.py
+from .ocpp_utils import send_ocpp_message_and_await_response
 
-async def handle_remote_stop_transaction(payload):
-    transaction_id = payload.get("transactionId")
-    if not transaction_id:
-        return {"status": "Rejected", "error": "MissingTransactionId"}
+async def cs_remote_stop_transaction(cpid, transaction_id):
+    action = "RemoteStopTransaction"
+    payload = {"transactionId": transaction_id}
+    response = await send_ocpp_message_and_await_response(cpid, action, payload)
+    return response
 
-    session = ChargingSession.objects.filter(id=transaction_id).first()
-    if session:
-        session.end_time = now()
-        session.save()
-        return {"status": "Accepted"}
-    else:
-        return {"status": "Rejected", "error": "InvalidTransactionId"}

@@ -1,19 +1,11 @@
-# change_configuration.py
-from ocpp_app.models import ChargerConfig
+# ocpp_app/message_handlers/cs_change_configuration.py
+from .ocpp_utils import send_ocpp_message_and_await_response
 
-async def handle_change_configuration(payload):
-    key = payload.get("key")
-    value = payload.get("value")
-    if not all([key, value]):
-        return {"status": "Rejected", "error": "MissingRequiredFields"}
-
-    config = ChargerConfig.objects.filter(key=key).first()
-    if config:
-        if config.readonly:
-            return {"status": "Rejected", "error": "ConfigurationReadOnly"}
-        else:
-            config.value = value
-            config.save()
-            return {"status": "Accepted"}
-    else:
-        return {"status": "Rejected", "error": "InvalidConfigurationKey"}
+async def cs_change_configuration(cpid, key, value):
+    action = "ChangeConfiguration"
+    payload = {
+        "key": key,
+        "value": value
+    }
+    response = await send_ocpp_message_and_await_response(cpid, action, payload)
+    return response

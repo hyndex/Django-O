@@ -1,19 +1,11 @@
-# change_availability.py
-from ocpp_app.models import Connector
+# ocpp_app/message_handlers/cs_change_availability.py
+from .ocpp_utils import send_ocpp_message_and_await_response
 
-async def handle_change_availability(payload):
-    connector_id = payload.get("connectorId")
-    type = payload.get("type")
-    if not all([connector_id, type]):
-        return {"status": "Rejected", "error": "MissingRequiredFields"}
-
-    connector = Connector.objects.filter(id=connector_id).first()
-    if connector:
-        if type in ["Operative", "Inoperative"]:
-            connector.status = "Available" if type == "Operative" else "Unavailable"
-            connector.save()
-            return {"status": "Accepted"}
-        else:
-            return {"status": "Rejected", "error": "InvalidType"}
-    else:
-        return {"status": "Rejected", "error": "InvalidConnectorId"}
+async def cs_change_availability(cpid, connector_id, type):
+    action = "ChangeAvailability"
+    payload = {
+        "connectorId": connector_id,
+        "type": type
+    }
+    response = await send_ocpp_message_and_await_response(cpid, action, payload)
+    return response

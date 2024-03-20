@@ -1,6 +1,7 @@
-from django.urls import path
+# ocpp_app/routing.py
+from django.urls import re_path
 from .consumers import OCPPConsumer
 
 websocket_urlpatterns = [
-    path('ws/ocpp/', OCPPConsumer.as_asgi()),
+    re_path(r'ws/ocpp/(?P<cpid>\w+)/$', OCPPConsumer.as_asgi()),
 ]

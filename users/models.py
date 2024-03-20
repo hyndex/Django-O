@@ -5,6 +5,7 @@ from django.contrib.auth.models import User
 from django.utils.timezone import now
 from django.contrib.gis.db import models as gis_models
 import uuid
+from push_notifications.models import APNSDevice, GCMDevice
 
 
 # Assuming WEB_SOCKET_PING_INTERVAL is defined somewhere in your settings
@@ -107,10 +108,25 @@ class Promotion(models.Model):
     readonly = models.BooleanField(default=False)
 
 
+
 class Device(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    token = models.CharField(max_length=255)
+    device_id = models.CharField(max_length=255)
+    registration_id = models.CharField(max_length=255)
     device_type = models.CharField(max_length=10, choices=[('ANDROID', 'Android'), ('IOS', 'iOS')])
+
+    def save(self, *args, **kwargs):
+        if self.device_type == 'ANDROID':
+            GCMDevice.objects.update_or_create(
+                registration_id=self.registration_id,
+                defaults={'user': self.user, 'device_id': self.device_id}
+            )
+        elif self.device_type == 'IOS':
+            APNSDevice.objects.update_or_create(
+                registration_id=self.registration_id,
+                defaults={'user': self.user, 'device_id': self.device_id}
+            )
+        super(Device, self).save(*args, **kwargs)
 
 
 # Role Model

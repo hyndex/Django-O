@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Wallet, Order, PaymentInfo, SessionBilling
+from .models import Wallet, Order, PaymentInfo, SessionBilling, Device
 
 class PaymentInfoSerializer(serializers.ModelSerializer):
     class Meta:
@@ -25,3 +25,9 @@ class OrderSerializer(serializers.ModelSerializer):
         model = Order
         fields = ['id', 'user', 'amount', 'tax', 'gateway_id', 'gateway_name', 'order_serial', 'type', 'limit_type', 'property', 'status', 'payment_info', 'session_billing', 'wallet']
         read_only_fields = ['user']
+
+
+class DeviceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Device
+        fields = ['device_id', 'registration_id', 'device_type']

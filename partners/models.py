@@ -5,6 +5,7 @@ from django.contrib.auth.models import User
 from django.utils.timezone import now
 import uuid
 
+
 # Assuming WEB_SOCKET_PING_INTERVAL is defined somewhere in your settings
 WEB_SOCKET_PING_INTERVAL = 30
 
@@ -43,36 +44,61 @@ class SettlementRequest(models.Model):
     status = models.CharField(max_length=255)
     note = models.TextField()
 
-
-# UserHostCustomUserList Model
-class UserHostCustomUserList(models.Model):
+# Partner Commission Group Model
+class PartnerCommissionGroup(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='custom_user_lists')
+    name = models.CharField(max_length=255)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    host_type = models.CharField(max_length=255, default='SUB-CSMS')
+    enable_user_wise_bank_settlement = models.BooleanField(default=False)
+
+# Partner Commission Model
+class PartnerCommission(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    commission = models.FloatField(default=0)
+    commission_type = models.CharField(max_length=255, default='PERCENT')
+    max_amount = models.FloatField()
+    min_amount = models.FloatField()
+    min_threshold = models.FloatField()
+    status = models.CharField(max_length=255, default='ACTIVE')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    partner_commission_group = models.ForeignKey(PartnerCommissionGroup, on_delete=models.CASCADE, related_name='commissions')
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    role = models.CharField(max_length=255, default='Admin')
+    expiry = models.DateTimeField()
+
+# Partner Commission Group User Model
+class PartnerCommissionGroupUser(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    status = models.CharField(max_length=255, default='ACTIVE')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    partner_commission_group = models.ForeignKey(PartnerCommissionGroup, on_delete=models.CASCADE, related_name='users')
+
+# Host Custom User List Model
+class PartnerEmployeeList(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=255)
+    list_type = models.CharField(max_length=255, default='Default Driver List')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    partner_commission_group = models.ForeignKey(PartnerCommissionGroup, on_delete=models.CASCADE, related_name='custom_user_lists')
+
+# User Host Custom User List Model
+class UserPartnerEmployeeList(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
     is_blocked = models.BooleanField(default=False)
     expiry_date = models.DateTimeField(null=True, blank=True)
+    host_custom_user_list = models.ForeignKey(PartnerEmployeeList, on_delete=models.CASCADE, related_name='user_lists')
     address = models.CharField(max_length=255, null=True, blank=True)
     state = models.CharField(max_length=255, null=True, blank=True)
     city = models.CharField(max_length=255, null=True, blank=True)
-    pin = models.CharField(max_length=10, null=True, blank=True)
+    pin = models.CharField(max_length=255, null=True, blank=True)
+    job_title = models.CharField(max_length=255, null=True, blank=True)
     first_name = models.CharField(max_length=255, null=True, blank=True)
     last_name = models.CharField(max_length=255, null=True, blank=True)
-    email = models.EmailField(null=True, blank=True)
-    # Additional field to determine if the list entry has expired
-    is_expired = models.BooleanField(default=False)
-
-    def save(self, *args, **kwargs):
-        if self.expiry_date and now() > self.expiry_date:
-            self.is_expired = True
-        super(UserHostCustomUserList, self).save(*args, **kwargs)
-
-# UserHostCustomUserListMovement Model
-class UserHostCustomUserListMovement(models.Model):
-    user_list_entry = models.ForeignKey(UserHostCustomUserList, on_delete=models.CASCADE, related_name='movements')
-    coordinates = gis_models.PointField()
-    timestamp = models.DateTimeField(auto_now_add=True)
-    details = models.TextField(blank=True, null=True)
-
-    @property
-    def online(self):
-        time_difference = now() - self.timestamp
-        return time_difference.total_seconds() <= (WEB_SOCKET_PING_INTERVAL + 10)
+    email = models.CharField(max_length=255, null=True, blank=True)

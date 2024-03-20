@@ -37,7 +37,9 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'rest_framework',
     'django_otp',
+    'push_notifications',
     'django_otp.plugins.otp_totp',
     'ocpp_app',
 ]
@@ -53,6 +55,21 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = 'django_ocpp.urls'
+
+
+REST_FRAMEWORK = {
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle'
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '10000/minute',
+        'user': '10000/minute'
+    }
+}
+
+
+
 
 TEMPLATES = [
     {
@@ -132,3 +149,28 @@ EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = 'your-smtp-username'
 EMAIL_HOST_PASSWORD = 'your-smtp-password'
+
+
+AWS_ACCESS_KEY_ID = 'your-access-key'
+AWS_SECRET_ACCESS_KEY = 'your-secret-key'
+AWS_STORAGE_BUCKET_NAME = 'your-bucket-name'
+AWS_S3_CUSTOM_DOMAIN = f'{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com'
+AWS_S3_OBJECT_PARAMETERS = {'CacheControl': 'max-age=86400'}
+AWS_LOCATION = 'static'
+
+STATIC_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/{AWS_LOCATION}/'
+STATICFILES_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+
+
+PUSH_NOTIFICATIONS_SETTINGS = {
+    "APNS_CERTIFICATE": "/path/to/your/certificate.pem",
+}
+
+PUSH_NOTIFICATIONS_SETTINGS = {
+    "FCM_API_KEY": "your_fcm_api_key",
+}
+
+
+# SECURE_SSL_REDIRECT = True
+# SESSION_COOKIE_SECURE = True
+# CSRF_COOKIE_SECURE = True

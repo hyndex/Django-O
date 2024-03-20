@@ -1,5 +1,6 @@
 import boto3
 from django.core.mail import send_mail
+from push_notifications.models import APNSDevice, GCMDevice
 
 def send_sms(phone_number, message):
     client = boto3.client('sns')
@@ -19,3 +20,11 @@ def send_email(subject, message, recipient_list):
         recipient_list
     )
 
+
+
+def send_push_notification(user, message):
+    devices = APNSDevice.objects.filter(user=user)
+    devices.send_message(message)
+
+    devices = GCMDevice.objects.filter(user=user)
+    devices.send_message(message)

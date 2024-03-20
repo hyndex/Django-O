@@ -164,16 +164,11 @@ def pay_subscription(request):
 
 @api_view(['POST'])
 def register_device(request):
-    user = request.user
-    token = request.data.get('token')
-    device_type = request.data.get('device_type')
-
-    Device.objects.update_or_create(
-        user=user,
-        defaults={'token': token, 'device_type': device_type}
-    )
-
-    return Response({'message': 'Device registered successfully'})
+    serializer = DeviceSerializer(data=request.data)
+    if serializer.is_valid():
+        serializer.save(user=request.user)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 

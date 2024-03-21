@@ -31,7 +31,7 @@ class UserProfile(models.Model):
 # Payment Info Model
 class PaymentInfo(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    order = models.ForeignKey('Order', on_delete=models.CASCADE, related_name='payment_info')
+    order = models.ForeignKey('Order', on_delete=models.CASCADE, related_name='order_payment_info', null=True, blank=True)
     amount = models.FloatField()
     method = models.CharField(max_length=255)
     captured = models.BooleanField(default=False)
@@ -53,8 +53,8 @@ class PaymentInfo(models.Model):
 
 # SessionBilling Model
 class SessionBilling(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    session = models.ForeignKey('ChargingSession', on_delete=models.CASCADE, related_name='billings')
+    id = models.CharField(primary_key=True, max_length=255)
+    session = models.ForeignKey('ocpp_app.ChargingSession', on_delete=models.CASCADE, related_name='billings')
     amount_added = models.FloatField()
     amount_consumed = models.FloatField()
     amount_refunded = models.FloatField()
@@ -196,7 +196,7 @@ class Wallet(models.Model):
 class Order(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='orders')
-    payment_info = models.OneToOneField(PaymentInfo, on_delete=models.CASCADE, related_name='order', null=True, blank=True)
+    payment_info = models.OneToOneField(PaymentInfo, on_delete=models.CASCADE, related_name='order_payment_info', null=True, blank=True)
     session_billing = models.ForeignKey(SessionBilling, on_delete=models.CASCADE, related_name='orders', null=True, blank=True)
     wallet = models.ForeignKey(Wallet, on_delete=models.CASCADE, related_name='orders', null=True, blank=True)
     amount = models.FloatField()

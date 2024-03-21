@@ -1,6 +1,8 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.utils.timezone import now
+from partners.models import PartnerCommissionMemberGroup
+import uuid
 
 class Charger(models.Model):
     id = models.AutoField(primary_key=True)
@@ -13,6 +15,7 @@ class Charger(models.Model):
     enabled = models.BooleanField(default=False)
     price_per_kwh = models.FloatField(default=20)
     verified = models.BooleanField(default=False)
+    charger_commission_group = models.ForeignKey(PartnerCommissionMemberGroup, on_delete=models.CASCADE, related_name='ocpp_charger_commissions')
     type = models.CharField(max_length=10, default='AC', choices=[('AC', 'AC'), ('DC', 'DC'), ('BOTH', 'BOTH')])
 
     @property
@@ -67,8 +70,6 @@ class IdTag(models.Model):
     def is_expired(self):
         return self.expiry_date and now() > self.expiry_date
 
-
-
 class MeterValues(models.Model):
     id = models.CharField(primary_key=True, max_length=255)
     value = models.CharField(max_length=255)
@@ -99,3 +100,7 @@ class MeterValues(models.Model):
         null=True,
         blank=True
     )
+
+
+
+

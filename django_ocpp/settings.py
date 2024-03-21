@@ -41,7 +41,11 @@ INSTALLED_APPS = [
     'django_otp',
     'push_notifications',
     'django_otp.plugins.otp_totp',
-    # 'ocpp_app',
+    'ocpp_app',
+    'partners',
+    'users',
+    'ocpi',
+    'stateless',
 ]
 
 MIDDLEWARE = [
@@ -169,6 +173,9 @@ PUSH_NOTIFICATIONS_SETTINGS = {
 PUSH_NOTIFICATIONS_SETTINGS = {
     "FCM_API_KEY": "your_fcm_api_key",
 }
+
+GDAL_LIBRARY_PATH = '/usr/lib/libgdal.so.30'
+
 
 
 # SECURE_SSL_REDIRECT = True

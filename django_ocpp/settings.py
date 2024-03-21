@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     'users',
     'ocpi',
     'stateless',
+    'pygwalker',
 ]
 
 MIDDLEWARE = [

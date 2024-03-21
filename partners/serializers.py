@@ -1,12 +1,8 @@
 from rest_framework import serializers
-from .models import (ChargerOwner, BankAccount, Settlement, SettlementRequest,
+from .models import (BankAccount, Settlement, SettlementRequest,
                      PartnerCommissionGroup, PartnerCommission, PartnerCommissionGroupUser,
-                     PartnerEmployeeList, UserPartnerEmployeeList)
+                     PartnerEmployeeList, UserPartnerEmployeeList, CommissionPayment)
 
-class ChargerOwnerSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = ChargerOwner
-        fields = '__all__'
 
 class BankAccountSerializer(serializers.ModelSerializer):
     owner = ChargerOwnerSerializer(read_only=True)
@@ -54,4 +50,11 @@ class UserPartnerEmployeeListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = UserPartnerEmployeeList
+        fields = '__all__'
+
+
+
+class CommissionPaymentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CommissionPayment
         fields = '__all__'

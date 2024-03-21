@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
+from django.contrib.gis.db import models as gis_models
 from django.utils.timezone import now
 from partners.models import PartnerCommissionMemberGroup
 import uuid
@@ -17,7 +18,8 @@ class Charger(models.Model):
     verified = models.BooleanField(default=False)
     charger_commission_group = models.ForeignKey(PartnerCommissionMemberGroup, on_delete=models.CASCADE, related_name='ocpp_charger_commissions')
     type = models.CharField(max_length=10, default='AC', choices=[('AC', 'AC'), ('DC', 'DC'), ('BOTH', 'BOTH')])
-
+    coordinates = gis_models.PointField(geography=True, blank=True, null=True)
+    
     @property
     def online(self):
         if self.last_heartbeat:

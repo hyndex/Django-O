@@ -8,8 +8,13 @@ from .views import (
     remote_start_transaction_view,
     remote_stop_transaction_view,
 )
+from .views import ChargerViewSet
+
+router = DefaultRouter()
+router.register(r'chargers', ChargerViewSet, basename='charger')
 
 urlpatterns = [
+    path('', include(router.urls)),
     path('change_availability/', change_availability_view, name='change_availability'),
     path('change_configuration/', change_configuration_view, name='change_configuration'),
     path('clear_cache/', clear_cache_view, name='clear_cache'),
@@ -17,3 +22,5 @@ urlpatterns = [
     path('remote_start_transaction/', remote_start_transaction_view, name='remote_start_transaction'),
     path('remote_stop_transaction/', remote_stop_transaction_view, name='remote_stop_transaction'),
 ]
+
+

@@ -1,15 +1,27 @@
-from rest_framework import status
+from django.conf import settings
+from django.contrib.auth import authenticate
+from django.contrib.auth.models import User
+from django.core.mail import send_mail
+from django_otp.plugins.otp_totp.models import TOTPDevice
+from rest_framework import generics, permissions, status, viewsets
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from django.contrib.auth.models import User
-from django_otp.plugins.otp_totp.models import TOTPDevice
-from .models import Order, Wallet, PaymentInfo, Plan, PlanUser, Device
-from rest_framework import viewsets
-from rest_framework.permissions import IsAuthenticated
-from .models import Wallet, Order
-from .serializers import WalletSerializer, OrderSerializer
+from rest_framework.views import APIView
+from rest_framework_simplejwt.tokens import RefreshToken
+
 import razorpay
-from django.conf import settings
+import requests
+from random import randint
+
+from .models import Device, OTP, Order, PaymentInfo, Plan, PlanUser, UserProfile, Wallet
+from .serializers import (
+    ChangePasswordSerializer,
+    DeviceSerializer,
+    OrderSerializer,
+    UserSerializer,
+    WalletSerializer,
+)
+from .utils import send_otp_email, send_otp_sms, send_sms
 
 # Initialize Razorpay client
 razorpay_client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
@@ -170,8 +182,6 @@ def register_device(request):
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-
-
 class WalletViewSet(viewsets.ModelViewSet):
     serializer_class = WalletSerializer
     permission_classes = [IsAuthenticated]
@@ -185,3 +195,196 @@ class OrderViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         return Order.objects.filter(user=self.request.user)
+
+# View for user profile
+class UserProfileView(generics.RetrieveUpdateAPIView):
+    serializer_class = UserSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_object(self):
+        return self.request.user
+
+# View for deleting user account
+class DeleteAccountView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def delete(self, request):
+        user = request.user
+        user.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+# View for refreshing JWT token
+class RefreshTokenView(APIView):
+    def post(self, request):
+        refresh_token = request.data.get('refresh')
+        if refresh_token:
+            try:
+                token = RefreshToken(refresh_token)
+                return Response({'access': str(token.access_token)}, status=status.HTTP_200_OK)
+            except Exception as e:
+                return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'error': 'No refresh token provided'}, status=status.HTTP_400_BAD_REQUEST)
+
+# View for setting new password
+class SetPasswordView(generics.UpdateAPIView):
+    serializer_class = ChangePasswordSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    model = User
+
+    def get_object(self, queryset=None):
+        return self.request.user
+
+# View for login with password
+class LoginWithPasswordView(APIView):
+    def post(self, request):
+        username = request.data.get('username')
+        password = request.data.get('password')
+        user = authenticate(username=username, password=password)
+        if user:
+            refresh = RefreshToken.for_user(user)
+            return Response({'refresh': str(refresh), 'access': str(refresh.access_token)}, status=status.HTTP_200_OK)
+        return Response({'error': 'Invalid credentials'}, status=status.HTTP_400_BAD_REQUEST)
+
+# View for forgot password
+class ForgotPasswordView(APIView):
+    def post(self, request):
+        email_or_phone = request.data.get('email_or_phone')
+        user = User.objects.filter(email=email_or_phone).first() or User.objects.filter(username=email_or_phone).first()
+
+        if user:
+            otp = OTP.objects.create(user=user)
+            if '@' in email_or_phone:
+                send_otp_email(email_or_phone, otp.code)
+            else:
+                send_otp_sms(email_or_phone, otp.code)
+            return Response({'message': 'OTP sent to your email or phone'}, status=status.HTTP_200_OK)
+        return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
+# View for verify OTP and set new password
+class VerifyOTPView(APIView):
+    def post(self, request):
+        otp_code = request.data.get('otp')
+        new_password = request.data.get('new_password')
+        otp = OTP.objects.filter(code=otp_code, is_active=True).first()
+
+        if otp and otp.is_valid():
+            user = otp.user
+            user.set_password(new_password)
+            user.save()
+            otp.is_active = False  # Deactivate OTP after use
+            otp.save()
+            return Response({'message': 'Password reset successfully'}, status=status.HTTP_200_OK)
+        return Response({'error': 'Invalid or expired OTP'}, status=status.HTTP_400_BAD_REQUEST)
+
+           
+
+
+@api_view(['POST'])
+def send_otp(request):
+    user = request.user
+    type = request.data.get('type')
+
+    if type not in ['phone', 'email']:
+        return Response({'error': 'Invalid type'}, status=400)
+
+    otp = str(randint(100000, 999999))
+    OTP.objects.create(user=user, otp=otp, type=type)
+
+    if type == 'phone':
+        phone_number = user.profile.phone_number
+        # Send OTP to phone using SMS gateway
+        # Example: requests.post('SMS_GATEWAY_URL', data={'phone': phone_number, 'message': f'Your OTP is: {otp}'})
+    elif type == 'email':
+        email = user.email
+        # Send OTP to email
+        send_mail(
+            'Verify your email',
+            f'Your OTP is: {otp}',
+            settings.EMAIL_HOST_USER,
+            [email],
+            fail_silently=False,
+        )
+
+    return Response({'message': 'OTP sent successfully'})
+
+@api_view(['POST'])
+def verify_otp(request):
+    user = request.user
+    otp = request.data.get('otp')
+    type = request.data.get('type')
+
+    if type not in ['phone', 'email']:
+        return Response({'error': 'Invalid type'}, status=400)
+
+    otp_object = OTP.objects.filter(user=user, otp=otp, type=type).first()
+
+    if otp_object and otp_object.is_valid():
+        if type == 'phone':
+            user.profile.is_phone_verified = True
+        elif type == 'email':
+            user.profile.is_email_verified = True
+        user.profile.save()
+        otp_object.delete()
+        return Response({'message': 'Verification successful'})
+    else:
+        return Response({'error': 'Invalid or expired OTP'}, status=400)
+
+
+@api_view(['POST'])
+def update_phone(request):
+    user = request.user
+    new_phone = request.data.get('phone_number')
+
+    if UserProfile.objects.filter(phone_number=new_phone).exists():
+        return Response({'error': 'Phone number already exists'}, status=400)
+
+    otp = str(randint(100000, 999999))
+    OTP.objects.create(user=user, otp=otp, type='phone')
+    # Use the send_sms function to send OTP to the new phone number
+    send_sms(new_phone, f'Your OTP is: {otp}')
+
+    return Response({'message': 'OTP sent to new phone number'})
+
+@api_view(['POST'])
+def update_email(request):
+    user = request.user
+    new_email = request.data.get('email')
+
+    if User.objects.filter(email=new_email).exists():
+        return Response({'error': 'Email already exists'}, status=400)
+
+    otp = str(randint(100000, 999999))
+    OTP.objects.create(user=user, otp=otp, type='email')
+    # Send OTP to new email
+    send_mail(
+        'Verify your email',
+        f'Your OTP is: {otp}',
+        settings.EMAIL_HOST_USER,
+        [new_email],
+        fail_silently=False,
+    )
+
+    return Response({'message': 'OTP sent to new email'})
+
+@api_view(['POST'])
+def verify_update(request):
+    user = request.user
+    otp = request.data.get('otp')
+    type = request.data.get('type')
+    new_value = request.data.get('new_value')
+
+    otp_object = OTP.objects.filter(user=user, otp=otp, type=type).first()
+
+    if otp_object and otp_object.is_valid():
+        if type == 'phone':
+            user.profile.phone_number = new_value
+            user.profile.is_phone_verified = True
+        elif type == 'email':
+            user.email = new_value
+            user.profile.is_email_verified = True
+        user.save()
+        user.profile.save()
+        otp_object.delete()
+        return Response({'message': 'Update successful'})
+    else:
+        return Response({'error': 'Invalid or expired OTP'}, status=400)

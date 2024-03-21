@@ -12,13 +12,13 @@ def send_sms(phone_number, message):
 
 
 
-def send_email(subject, message, recipient_list):
-    send_mail(
-        subject,
-        message,
-        'your-email@example.com',  # Your verified SES email
-        recipient_list
-    )
+# def send_email(subject, message, recipient_list):
+#     send_mail(
+#         subject,
+#         message,
+#         'your-email@example.com',  # Your verified SES email
+#         recipient_list
+#     )
 
 
 

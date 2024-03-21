@@ -5,14 +5,18 @@ from .ocpp_task_manager import OCPPTaskManager
 from .ocpp_message_handler import OCPPMessageHandler
 
 class OCPPConsumer(AsyncWebsocketConsumer):
+    connected_chargers = set()
+
     async def connect(self):
         self.cpid = self.scope['url_route']['kwargs']['cpid']
         self.ocpp_task_manager = OCPPTaskManager(self.channel_name)
         self.ocpp_message_handler = OCPPMessageHandler()
         await self.accept()
+        self.connected_chargers.add(self.cpid)
 
     async def disconnect(self, close_code):
-        pass  # Add any cleanup logic here
+        self.connected_chargers.discard(self.cpid)
+
 
     async def receive(self, text_data):
         message = json.loads(text_data)

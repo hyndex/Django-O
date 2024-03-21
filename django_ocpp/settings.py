@@ -68,20 +68,27 @@ CHANNEL_LAYERS = {
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
 
 INSTALLED_APPS = [
-    'django.contrib.admin',
+    # 'admin_soft.apps.AdminSoftDashboardConfig',
+    "unfold",
+    "unfold.contrib.filters",  # optional, if special filters are needed
+    "unfold.contrib.forms",  # optional, if special form elements are needed
+    "unfold.contrib.import_export",  # optional, if django-import-export package is used
+    "unfold.contrib.guardian",  # optional, if django-guardian package is used
+    "unfold.contrib.simple_history",  # optional, if django-simple-history package is used
+
+    "django.contrib.admin",
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django.contrib.gis',
-    'channels',
     'rest_framework',
     'django_otp',
     'push_notifications',
@@ -92,13 +99,15 @@ INSTALLED_APPS = [
     'ocpi',
     'stateless',
     'djangoaddicts.pygwalker',
+    'channels',
 ]
+
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
+    # 'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
@@ -138,6 +147,7 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'django_ocpp.wsgi.application'
 
+ASGI_APPLICATION = 'django_ocpp.asgi.application'
 
 
 # Password validation
@@ -199,6 +209,13 @@ PUSH_NOTIFICATIONS_SETTINGS = {
     "FCM_API_KEY": "your_fcm_api_key",
     "APNS_CERTIFICATE": "/path/to/your/certificate.pem",
 }
+
+UNFOLD = {
+    "SITE_TITLE": "My Charger Admin",
+    "SITE_HEADER": "Charger Management",
+    "SITE_ICON": "bolt",  # You can use any Material Icon name here
+}
+
 
 
 # SECURE_SSL_REDIRECT = True

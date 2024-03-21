@@ -2,27 +2,30 @@
 import json
 import asyncio
 from ocpp.v16.enums import Action
-from .message_handlers import (
-    handle_authorize,
-    handle_boot_notification,
-    handle_heartbeat,
-    handle_metervalues,
-    handle_start_transaction,
-    handle_status_notification,
-    handle_stop_transaction,
-    handle_clear_cache,
-    handle_change_availability,
-    handle_change_configuration,
-    handle_get_configuration,
-    handle_remote_start_transaction,
-    handle_remote_stop_transaction,
-    handle_reset,
-    handle_trigger_message,
-    handle_unlock_connector,
-)
+# from .message_handlers import (
+#     handle_authorize,
+#     handle_boot_notification,
+#     handle_heartbeat,
+#     handle_metervalues,
+#     handle_start_transaction,
+#     handle_status_notification,
+#     handle_stop_transaction,
+# )
+
+from .message_handlers.handle_authorize import handle_authorize
+from .message_handlers.handle_boot_notification import handle_boot_notification
+from .message_handlers.handle_heartbeat import handle_heartbeat
+from .message_handlers.handle_metervalues import handle_metervalues
+from .message_handlers.handle_start_transaction import handle_start_transaction
+from .message_handlers.handle_status_notification import handle_status_notification
+from .message_handlers.handle_stop_transaction import handle_stop_transaction
+
 
 class OCPPMessageHandler:
     def __init__(self):
+        self.call_results = {}
+        self.call_errors = {}
+
         self.handlers = {
             Action.Authorize: handle_authorize,
             Action.BootNotification: handle_boot_notification,
@@ -34,8 +37,8 @@ class OCPPMessageHandler:
             # Add other handlers as needed
         }
 
-    async def handle_message(self, message):
-        parsed_message = json.loads(message)
+    async def handle_message(self, parsed_message):
+        # parsed_message = json.loads(message)
         message_type = parsed_message[0]
 
         if message_type == 2:  # CALL
@@ -52,7 +55,7 @@ class OCPPMessageHandler:
         message_id, action, payload = message[1], message[2], message[3]
         handler = self.handlers.get(action)
         if handler:
-            response_payload = handler(payload)
+            response_payload = await handler(payload)
             future = asyncio.Future()
             self.call_results[message_id] = future
             try:

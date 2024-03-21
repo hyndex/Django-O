@@ -1,9 +1,9 @@
 # ocpp_app/message_handlers/handle_metervalues.py
-from ocpp_app.models import ChargingSession, MeterValue
+from ocpp_app.models import ChargingSession, MeterValues
 
 def handle_metervalues(payload):
     transaction_id = payload.get("transactionId")
-    meter_values = payload.get("meterValue", [])
+    meter_values = payload.get("MeterValues", [])
     session = ChargingSession.objects.filter(transaction_id=transaction_id).first()
 
     if session:
@@ -11,7 +11,7 @@ def handle_metervalues(payload):
             timestamp = meter_value.get("timestamp")
             sampled_values = meter_value.get("sampledValue", [])
             for sampled_value in sampled_values:
-                MeterValue.objects.create(
+                MeterValues.objects.create(
                     charging_session=session,
                     timestamp=timestamp,
                     value=sampled_value.get("value"),

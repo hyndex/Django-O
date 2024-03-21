@@ -1,6 +1,6 @@
 import asyncio
 from datetime import datetime, timedelta
-from .utils import send_sms, send_push_notification
+from users.utils import send_sms, send_push_notification
 
 class RemoteStartQueueManager:
     def __init__(self, timeout_minutes=5, reminder_minutes=2):

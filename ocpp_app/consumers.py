@@ -4,33 +4,55 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 from .ocpp_task_manager import OCPPTaskManager
 from .ocpp_message_handler import OCPPMessageHandler
 from asgiref.sync import async_to_sync
-from .models import ChargingSession, MeterValues
+from .models import ChargingSession, MeterValues, IdTag
+import logging
+
+logger = logging.getLogger(__name__)
 
 class OCPPConsumer(AsyncWebsocketConsumer):
     connected_chargers = set()
 
     async def connect(self):
-        self.cpid = self.scope['url_route']['kwargs']['cpid']
-        self.ocpp_task_manager = OCPPTaskManager(self.channel_name)
-        self.ocpp_message_handler = OCPPMessageHandler()
-        await self.accept()
-        self.connected_chargers.add(self.cpid)
+        try:
+            self.subprotocol = self.scope.get('subprotocols', [])
+            if 'ocpp1.6j' or 'ocpp1.6' in self.subprotocol:
+                await self.accept(subprotocol=self.subprotocol[0])
+            else:
+                await self.close()
+            self.cpid = self.scope['url_route']['kwargs']['cpid']
+            self.ocpp_task_manager = OCPPTaskManager(self.channel_name)
+            self.ocpp_message_handler = OCPPMessageHandler()
+            # await self.accept()
+            self.connected_chargers.add(self.cpid)
+            logger.info(f"WebSocket connection established for CPID: {self.cpid}")
+        except Exception as e:
+            logger.error(f"Error during WebSocket connection: {e}")
+            await self.close()
 
     async def disconnect(self, close_code):
-        self.connected_chargers.discard(self.cpid)
-
+        try:
+            self.connected_chargers.discard(self.cpid)
+            logger.info(f"WebSocket connection closed for CPID: {self.cpid}, close_code: {close_code}")
+        except Exception as e:
+            logger.error(f"Error during WebSocket disconnection: {e}")
 
     async def receive(self, text_data):
-        message = json.loads(text_data)
-        message_type = message[0]
+        try:
+            message = json.loads(text_data)
+            message_type = message[0]
 
-        if message_type == 2:  # CALL
-            response = await self.ocpp_message_handler.handle_message(message)
-            await self.send(response)
-        elif message_type == 3:  # CALLRESULT
-            self.ocpp_task_manager.handle_call_result(message[1], message[2])
-        elif message_type == 4:  # CALLERROR
-            self.ocpp_task_manager.handle_call_error(message[1], message[2], message[3], message[4])
+            if message_type == 2:  # CALL
+                response = await self.ocpp_message_handler.handle_message(message)
+                await self.send(response)
+            elif message_type == 3:  # CALLRESULT
+                self.ocpp_task_manager.handle_call_result(message[1], message[2])
+            elif message_type == 4:  # CALLERROR
+                self.ocpp_task_manager.handle_call_error(message[1], message[2], message[3], message[4])
+
+            logger.info(f"Received message: {message}")
+        except Exception as e:
+            logger.error(f"Error during WebSocket message processing: {e}")
+            await self.close()
 
 
 

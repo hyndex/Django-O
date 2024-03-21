@@ -60,11 +60,7 @@ class BankAccount(models.Model):
     currency = models.CharField(max_length=3)
 
 # Settlement Model
-class Settlement(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    amount = models.FloatField()
-    reason = models.CharField(max_length=255)
-    note = models.TextField()
+
 
 # SettlementRequest Model
 class SettlementRequest(models.Model):
@@ -72,6 +68,15 @@ class SettlementRequest(models.Model):
     amount = models.FloatField()
     status = models.CharField(max_length=255)
     note = models.TextField()
+
+
+class Settlement(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    amount = models.FloatField()
+    settlement_request = models.ForeignKey(SettlementRequest, on_delete=models.CASCADE, related_name='settlement_request')
+    reason = models.CharField(max_length=255)
+    note = models.TextField()
+
 
 # Host Custom User List Model
 class PartnerEmployeeList(models.Model):

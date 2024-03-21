@@ -3,7 +3,8 @@ from django.contrib.auth.models import User
 from django.contrib.gis.db import models as gis_models
 from django.utils.timezone import now
 from partners.models import PartnerCommissionMemberGroup
-import uuid
+from django.conf import settings
+from django.db.models import Max
 
 class Charger(models.Model):
     id = models.AutoField(primary_key=True)
@@ -11,12 +12,12 @@ class Charger(models.Model):
     meter_value_interval = models.IntegerField(null=True, blank=True)
     last_heartbeat = models.DateTimeField(null=True, blank=True)
     last_csms = models.CharField(max_length=255, null=True, blank=True)
-    vendor = models.CharField(max_length=255)
-    model = models.CharField(max_length=255)
+    vendor = models.CharField(max_length=255, null=True, blank=True)
+    model = models.CharField(max_length=255, null=True, blank=True)
     enabled = models.BooleanField(default=False)
     price_per_kwh = models.FloatField(default=20)
     verified = models.BooleanField(default=False)
-    charger_commission_group = models.ForeignKey(PartnerCommissionMemberGroup, on_delete=models.CASCADE, related_name='ocpp_charger_commissions')
+    charger_commission_group = models.ForeignKey(PartnerCommissionMemberGroup, on_delete=models.DO_NOTHING, blank=True, null=True,related_name='ocpp_charger_commissions')
     type = models.CharField(max_length=10, default='AC', choices=[('AC', 'AC'), ('DC', 'DC'), ('BOTH', 'BOTH')])
     coordinates = gis_models.PointField(geography=True, blank=True, null=True)
     
@@ -24,8 +25,12 @@ class Charger(models.Model):
     def online(self):
         if self.last_heartbeat:
             time_difference = now() - self.last_heartbeat
-            return time_difference.total_seconds() <= (WEB_SOCKET_PING_INTERVAL + 10)  # Adjust the interval as needed
+            return time_difference.total_seconds() <= (settings.WEB_SOCKET_PING_INTERVAL + 10)  # Adjust the interval as needed
         return False
+    
+    def __str__(self):
+        return f"{self.charger_id} - {self.vendor} {self.model}"
+
 
 class ChargerConfig(models.Model):
     id = models.AutoField(primary_key=True)
@@ -41,6 +46,16 @@ class Connector(models.Model):
     status = models.CharField(max_length=20, default='Unavailable', choices=[('Available', 'Available'), ('Preparing', 'Preparing'), ('Charging', 'Charging'), ('SuspendedEVSE', 'SuspendedEVSE'), ('SuspendedEV', 'SuspendedEV'), ('Finishing', 'Finishing'), ('Reserved', 'Reserved'), ('Unavailable', 'Unavailable'), ('Faulted', 'Faulted')])
     type = models.CharField(max_length=20, default='CCS1', choices=[('IEC60309', 'IEC60309'), ('CCS2', 'CCS2'), ('CCS1', 'CCS1'), ('CHADEMO', 'CHADEMO'), ('TYPE1', 'TYPE1'), ('TYPE2', 'TYPE2'), ('IEC62196', 'IEC62196'), ('3PIN', '3PIN')])
 
+    def save(self, *args, **kwargs):
+        if not self.connector_id:
+            max_connector_id = self.charger.connectors.aggregate(Max('connector_id'))['connector_id__max']
+            self.connector_id = (max_connector_id or 0) + 1
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"Connector {self.connector_id} for {self.charger}"
+    
+    
 class ChargingSession(models.Model):
     id = models.AutoField(primary_key=True)
     connector = models.ForeignKey(Connector, on_delete=models.CASCADE, related_name='sessions')
@@ -73,7 +88,7 @@ class IdTag(models.Model):
         return self.expiry_date and now() > self.expiry_date
 
 class MeterValues(models.Model):
-    id = models.CharField(primary_key=True, max_length=255)
+    id = models.AutoField(primary_key=True)
     value = models.CharField(max_length=255)
     unit = models.CharField(max_length=255, null=True, blank=True)
     format = models.CharField(max_length=255, null=True, blank=True)

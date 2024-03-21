@@ -53,7 +53,7 @@ class PaymentInfo(models.Model):
 
 # SessionBilling Model
 class SessionBilling(models.Model):
-    id = models.CharField(primary_key=True, max_length=255)
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     session = models.ForeignKey('ocpp_app.ChargingSession', on_delete=models.CASCADE, related_name='billings')
     amount_added = models.FloatField()
     amount_consumed = models.FloatField()
@@ -143,23 +143,6 @@ class Device(models.Model):
                 defaults={'user': self.user, 'device_id': self.device_id}
             )
         super(Device, self).save(*args, **kwargs)
-
-
-# Role Model
-class Role(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    role_name = models.CharField(max_length=255)
-    active = models.BooleanField(default=True)
-
-# RolePermission Model
-class RolePermission(models.Model):
-    role = models.ForeignKey(Role, on_delete=models.CASCADE, related_name='permissions')
-    module = models.CharField(max_length=255)
-    permission = models.CharField(max_length=255)
-    allowed = models.BooleanField(default=False)
-
-    class Meta:
-        unique_together = ('role', 'module', 'permission')
 
 
 

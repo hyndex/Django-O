@@ -13,8 +13,9 @@ from .models import (
     PartnerEmployeeList,
     UserPartnerEmployeeList,
     CommissionPayment,
-    ChargingSession
 )
+
+from ocpp_app.models import ChargingSession
 from .serializers import (
     PartnerCommissionMemberGroupSerializer,
     PartnerCommissionMemberSerializer,

@@ -16,11 +16,54 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
+
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Use environment variables
+SECRET_KEY = os.getenv('SECRET_KEY')
+DEBUG = os.getenv('DEBUG') == 'True'
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.contrib.gis.db.backends.postgis',
+        'NAME': os.getenv('DATABASE_NAME'),
+        'USER': os.getenv('DATABASE_USER'),
+        'PASSWORD': os.getenv('DATABASE_PASSWORD'),
+        'HOST': os.getenv('DATABASE_HOST'),
+        'PORT': os.getenv('DATABASE_PORT'),
+    }
+}
+EMAIL_HOST = os.getenv('EMAIL_HOST')
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD')
+AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
+AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
+AWS_STORAGE_BUCKET_NAME = os.getenv('AWS_STORAGE_BUCKET_NAME')
+APNS_CERTIFICATE = os.getenv('APNS_CERTIFICATE')
+FCM_API_KEY = os.getenv('FCM_API_KEY')
+GDAL_LIBRARY_PATH = os.getenv('GDAL_LIBRARY_PATH')
+RAZORPAY_KEY_ID = os.getenv('RAZORPAY_KEY_ID')
+RAZORPAY_KEY_SECRET = os.getenv('RAZORPAY_KEY_SECRET')
+AWS_S3_REGION_NAME = os.getenv('AWS_S3_REGION_NAME')
+WEB_SOCKET_PING_INTERVAL = os.getenv('WEB_SOCKET_PING_INTERVAL')
+
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            "hosts": [(os.getenv('REDIS_HOST'), int(os.getenv('REDIS_PORT')))],
+        },
+    },
+}
+
+
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-6&8l+8i=9r7%+g+!^$-&^2u+evi*g)+*-0atu2bv*^*l@^p)5x'
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -38,6 +81,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django.contrib.gis',
+    'channels',
     'rest_framework',
     'django_otp',
     'push_notifications',
@@ -47,7 +91,7 @@ INSTALLED_APPS = [
     'users',
     'ocpi',
     'stateless',
-    'pygwalker',
+    'djangoaddicts.pygwalker',
 ]
 
 MIDDLEWARE = [
@@ -76,7 +120,6 @@ REST_FRAMEWORK = {
 
 
 
-
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
@@ -95,16 +138,6 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'django_ocpp.wsgi.application'
 
-
-# Database
-# https://docs.djangoproject.com/en/5.0/ref/settings/#databases
-
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
-}
 
 
 # Password validation
@@ -138,10 +171,6 @@ USE_I18N = True
 USE_TZ = True
 
 
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/5.0/howto/static-files/
-
-STATIC_URL = 'static/'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field
@@ -150,34 +179,26 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'email-smtp.us-west-2.amazonaws.com'  # Change to your SES SMTP endpoint
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = 'your-smtp-username'
-EMAIL_HOST_PASSWORD = 'your-smtp-password'
 
 
-AWS_ACCESS_KEY_ID = 'your-access-key'
-AWS_SECRET_ACCESS_KEY = 'your-secret-key'
-AWS_STORAGE_BUCKET_NAME = 'your-bucket-name'
-AWS_S3_CUSTOM_DOMAIN = f'{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com'
+AWS_S3_CUSTOM_DOMAIN = f'{AWS_STORAGE_BUCKET_NAME}.s3.{AWS_S3_REGION_NAME}.amazonaws.com'
 AWS_S3_OBJECT_PARAMETERS = {'CacheControl': 'max-age=86400'}
 AWS_LOCATION = 'static'
 
-STATIC_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/{AWS_LOCATION}/'
+# Static and media files settings
+STATIC_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/static/'
+MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/media/'
+
+# Use S3 for static and media files storage
 STATICFILES_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
-
-
-PUSH_NOTIFICATIONS_SETTINGS = {
-    "APNS_CERTIFICATE": "/path/to/your/certificate.pem",
-}
+DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
 
 PUSH_NOTIFICATIONS_SETTINGS = {
     "FCM_API_KEY": "your_fcm_api_key",
+    "APNS_CERTIFICATE": "/path/to/your/certificate.pem",
 }
-
-GDAL_LIBRARY_PATH = '/usr/lib/libgdal.so.30'
-
 
 
 # SECURE_SSL_REDIRECT = True

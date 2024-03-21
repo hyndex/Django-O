@@ -1,12 +1,17 @@
 from rest_framework import serializers
-from .models import (BankAccount, Settlement, SettlementRequest,
-                     PartnerCommissionGroup, PartnerCommission, PartnerCommissionGroupUser,
-                     PartnerEmployeeList, UserPartnerEmployeeList, CommissionPayment)
-
-
+from .models import (
+    PartnerCommissionMemberGroup,
+    PartnerCommissionMember,
+    BankAccount,
+    Settlement,
+    SettlementRequest,
+    PartnerEmployeeList,
+    UserPartnerEmployeeList,
+    CommissionPayment
+)
+from users.models import SessionBilling
+from ocpp_app.models import ChargingSession
 class BankAccountSerializer(serializers.ModelSerializer):
-    owner = ChargerOwnerSerializer(read_only=True)
-
     class Meta:
         model = BankAccount
         fields = '__all__'
@@ -21,23 +26,17 @@ class SettlementRequestSerializer(serializers.ModelSerializer):
         model = SettlementRequest
         fields = '__all__'
 
-class PartnerCommissionSerializer(serializers.ModelSerializer):
+class CommissionPaymentSerializer(serializers.ModelSerializer):
     class Meta:
-        model = PartnerCommission
+        model = CommissionPayment
         fields = '__all__'
 
-class PartnerCommissionGroupSerializer(serializers.ModelSerializer):
-    commissions = PartnerCommissionSerializer(many=True, read_only=True)
+class PartnerCommissionMemberSerializer(serializers.ModelSerializer):
+    bank_accounts = BankAccountSerializer(many=True, read_only=True)
+    commission_payments = CommissionPaymentSerializer(many=True, read_only=True)
 
     class Meta:
-        model = PartnerCommissionGroup
-        fields = '__all__'
-
-class PartnerCommissionGroupUserSerializer(serializers.ModelSerializer):
-    partner_commission_group = PartnerCommissionGroupSerializer(read_only=True)
-
-    class Meta:
-        model = PartnerCommissionGroupUser
+        model = PartnerCommissionMember
         fields = '__all__'
 
 class PartnerEmployeeListSerializer(serializers.ModelSerializer):
@@ -52,9 +51,39 @@ class UserPartnerEmployeeListSerializer(serializers.ModelSerializer):
         model = UserPartnerEmployeeList
         fields = '__all__'
 
+class PartnerCommissionMemberGroupSerializer(serializers.ModelSerializer):
+    commission_members = PartnerCommissionMemberSerializer(many=True, read_only=True)
 
-
-class CommissionPaymentSerializer(serializers.ModelSerializer):
     class Meta:
-        model = CommissionPayment
+        model = PartnerCommissionMemberGroup
         fields = '__all__'
+
+
+class SessionBillingSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SessionBilling
+        fields = '__all__'
+
+class ChargingSessionSerializer(serializers.ModelSerializer):
+    session_billing = SessionBillingSerializer(read_only=True)
+    commission_payments = CommissionPaymentSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = ChargingSession
+        fields = [
+            'id',
+            'connector',
+            'transaction_id',
+            'start_time',
+            'end_time',
+            'meter_start',
+            'meter_stop',
+            'reservation_id',
+            'limit',
+            'reason',
+            'limit_type',
+            'id_tag',
+            'stop_id_tag',
+            'session_billing',
+            'commission_payments'
+        ]

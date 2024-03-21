@@ -8,6 +8,10 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework.permissions import IsAuthenticated
+from datetime import timedelta, datetime
+from django_otp.oath import TOTP
+
 
 import razorpay
 import requests
@@ -139,7 +143,7 @@ def subscribe_to_plan(request):
     PlanUser.objects.create(
         user=user,
         plan=plan,
-        expiry=now() + timezone.timedelta(days=plan.plan_renewal_interval),
+        expiry=datetime.now() + timedelta(days=plan.plan_renewal_interval),
         validity=plan.plan_renewal_interval
     )
 

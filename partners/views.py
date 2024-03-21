@@ -1,96 +1,50 @@
+from django.http import JsonResponse, HttpResponse
 from rest_framework import viewsets, permissions, mixins
-from .models import (ChargerOwner, BankAccount, Settlement, SettlementRequest,
-                     PartnerCommissionGroup, PartnerCommission, PartnerCommissionGroupUser,
-                     PartnerEmployeeList, UserPartnerEmployeeList)
-from .serializers import (ChargerOwnerSerializer, BankAccountSerializer, SettlementSerializer,
-                          SettlementRequestSerializer, PartnerCommissionGroupSerializer,
-                          PartnerCommissionSerializer, PartnerCommissionGroupUserSerializer,
-                          PartnerEmployeeListSerializer, UserPartnerEmployeeListSerializer)
-
-
-
-from django.http import JsonResponse
-from django.views.decorators.http import require_POST
-from rest_framework import viewsets
 from rest_framework.decorators import action
-from .models import PartnerCommissionMember, BankAccount, SettlementRequest, CommissionPayment, UserPartnerEmployeeList, ChargingSession
-from .serializers import PartnerCommissionMemberSerializer, BankAccountSerializer, SettlementRequestSerializer, UserPartnerEmployeeListSerializer, ChargingSessionSerializer
-from rest_framework.permissions import IsAuthenticated
 from django.db.models import Sum
 import csv
-from django.http import HttpResponse
+
+from .models import (
+    PartnerCommissionMemberGroup,
+    PartnerCommissionMember,
+    BankAccount,
+    Settlement,
+    SettlementRequest,
+    PartnerEmployeeList,
+    UserPartnerEmployeeList,
+    CommissionPayment,
+    ChargingSession
+)
+from .serializers import (
+    PartnerCommissionMemberGroupSerializer,
+    PartnerCommissionMemberSerializer,
+    BankAccountSerializer,
+    SettlementSerializer,
+    SettlementRequestSerializer,
+    PartnerEmployeeListSerializer,
+    UserPartnerEmployeeListSerializer,
+    ChargingSessionSerializer
+)
 
 
-class ChargerOwnerViewSet(viewsets.ModelViewSet):
-    queryset = ChargerOwner.objects.all()
-    serializer_class = ChargerOwnerSerializer
-    permission_classes = [permissions.IsAuthenticated]
-
-class BankAccountViewSet(viewsets.ModelViewSet):
-    serializer_class = BankAccountSerializer
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get_queryset(self):
-        user = self.request.user
-        return BankAccount.objects.filter(owner__user=user)
-
-    def perform_create(self, serializer):
-        instance = serializer.save()
-        # Log the creation of the bank account
-
-class SettlementViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = Settlement.objects.all()
-    serializer_class = SettlementSerializer
-    permission_classes = [permissions.IsAuthenticated]
-
-class SettlementRequestViewSet(mixins.CreateModelMixin,
-                               mixins.RetrieveModelMixin,
-                               mixins.ListModelMixin,
-                               viewsets.GenericViewSet):
-    queryset = SettlementRequest.objects.all()
-    serializer_class = SettlementRequestSerializer
-    permission_classes = [permissions.IsAuthenticated]
-
-class PartnerCommissionGroupViewSet(viewsets.ModelViewSet):
-    queryset = PartnerCommissionGroup.objects.all()
-    serializer_class = PartnerCommissionGroupSerializer
-    permission_classes = [permissions.IsAuthenticated]
-
-class PartnerCommissionViewSet(viewsets.ReadOnlyModelViewSet):
-    serializer_class = PartnerCommissionSerializer
+class PartnerCommissionMemberGroupViewSet(viewsets.ModelViewSet):
+    queryset = PartnerCommissionMemberGroup.objects.all()
+    serializer_class = PartnerCommissionMemberGroupSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
         user = self.request.user
-        return PartnerCommission.objects.filter(user=user)
-
-class PartnerCommissionGroupUserViewSet(viewsets.ModelViewSet):
-    serializer_class = PartnerCommissionGroupUserSerializer
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get_queryset(self):
-        user = self.request.user
-        return PartnerCommissionGroupUser.objects.filter(user=user)
-
-class PartnerEmployeeListViewSet(viewsets.ModelViewSet):
-    queryset = PartnerEmployeeList.objects.all()
-    serializer_class = PartnerEmployeeListSerializer
-    permission_classes = [permissions.IsAuthenticated]
-
-class UserPartnerEmployeeListViewSet(viewsets.ModelViewSet):
-    serializer_class = UserPartnerEmployeeListSerializer
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get_queryset(self):
-        user = self.request.user
-        return UserPartnerEmployeeList.objects.filter(user=user)
-
+        return PartnerCommissionMemberGroup.objects.filter(commission_members__user=user)
 
 
 class PartnerCommissionMemberViewSet(viewsets.ModelViewSet):
     queryset = PartnerCommissionMember.objects.all()
     serializer_class = PartnerCommissionMemberSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        return PartnerCommissionMember.objects.filter(user=user)
 
     @action(detail=True, methods=['post'])
     def request_settlement(self, request, pk=None):
@@ -105,10 +59,58 @@ class PartnerCommissionMemberViewSet(viewsets.ModelViewSet):
         else:
             return JsonResponse({'error': 'No unpaid commissions to settle'}, status=400)
 
+
+class BankAccountViewSet(viewsets.ModelViewSet):
+    serializer_class = BankAccountSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        return BankAccount.objects.filter(partner_commission_member__user=user)
+
+    def perform_create(self, serializer):
+        instance = serializer.save()
+        # Log the creation of the bank account
+
+
+class SettlementViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = Settlement.objects.all()
+    serializer_class = SettlementSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        return Settlement.objects.filter(partner_commission_member__user=user)
+
+
+class SettlementRequestViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.ListModelMixin, viewsets.GenericViewSet):
+    queryset = SettlementRequest.objects.all()
+    serializer_class = SettlementRequestSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        return SettlementRequest.objects.filter(partner_commission_member__user=user)
+
+
+class PartnerEmployeeListViewSet(viewsets.ModelViewSet):
+    queryset = PartnerEmployeeList.objects.all()
+    serializer_class = PartnerEmployeeListSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        return PartnerEmployeeList.objects.filter(partner_commission_member_group__commission_members__user=user)
+
+
 class UserPartnerEmployeeListViewSet(viewsets.ModelViewSet):
     queryset = UserPartnerEmployeeList.objects.all()
     serializer_class = UserPartnerEmployeeListSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        return UserPartnerEmployeeList.objects.filter(host_custom_user_list__partner_commission_member_group__commission_members__user=user)
 
     def create(self, request, *args, **kwargs):
         phone_number = request.data.get('phone_number')
@@ -116,10 +118,15 @@ class UserPartnerEmployeeListViewSet(viewsets.ModelViewSet):
             return JsonResponse({'error': 'Employee with this phone number already exists'}, status=400)
         return super().create(request, *args, **kwargs)
 
+
 class ChargingSessionViewSet(viewsets.ModelViewSet):
     queryset = ChargingSession.objects.all()
     serializer_class = ChargingSessionSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        return ChargingSession.objects.filter(connector__charger__charger_commission_group__commission_members__user=user)
 
     @action(detail=False, methods=['get'])
     def export_csv(self, request):
@@ -136,9 +143,10 @@ class ChargingSessionViewSet(viewsets.ModelViewSet):
                 session.end_time,
                 session.meter_start,
                 session.meter_stop,
-                session.billings.amount_added,
-                session.billings.amount_consumed,
-                session.billings.amount_refunded,
+                session.session_billing.amount_added if session.session_billing else '',
+                session.session_billing.amount_consumed if session.session_billing else '',
+                session.session_billing.amount_refunded if session.session_billing else '',
             ])
 
         return response
+

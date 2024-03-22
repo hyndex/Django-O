@@ -1,5 +1,4 @@
 # ocpp_app/message_handlers/cs_remote_start_transaction.py
-from .ocpp_utils import send_ocpp_message_and_await_response
 
 async def cs_remote_start_transaction(cpid, connector_id, id_tag, charging_profile=None):
     action = "RemoteStartTransaction"

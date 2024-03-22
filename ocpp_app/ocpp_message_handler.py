@@ -2,15 +2,6 @@
 import json
 import asyncio
 from ocpp.v16.enums import Action
-# from .message_handlers import (
-#     handle_authorize,
-#     handle_boot_notification,
-#     handle_heartbeat,
-#     handle_metervalues,
-#     handle_start_transaction,
-#     handle_status_notification,
-#     handle_stop_transaction,
-# )
 
 from .message_handlers.handle_authorize import handle_authorize
 from .message_handlers.handle_boot_notification import handle_boot_notification

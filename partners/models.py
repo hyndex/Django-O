@@ -11,7 +11,7 @@ class PartnerCommissionMemberGroup(models.Model):
     name = models.CharField(max_length=255)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    host_type = models.CharField(max_length=255, default='SUB-CSMS')
+    host_type = models.CharField(max_length=255, default='CORPORATE')
     enable_user_wise_bank_settlement = models.BooleanField(default=False)
 
 # Partner Commission Member Model

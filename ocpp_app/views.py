@@ -5,6 +5,10 @@ from .models import Charger, IdTag, Connector
 from .consumers import OCPPConsumer
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework.decorators import action
+from django.contrib.gis.geos import Point
+from rest_framework import viewsets
+from django.contrib.gis.db.models.functions import Distance
 from .serializers import (
     RemoteStartTransactionSerializer,
     RemoteStopTransactionSerializer,
@@ -13,6 +17,8 @@ from .serializers import (
     ClearCacheSerializer,
     ResetChargerSerializer,
 )
+from .serializers import ChargerSerializer
+
 
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
@@ -149,3 +155,42 @@ class ResetChargerView(APIView):
             )
         return Response(serializer.errors, status=400)
 
+
+
+class ChargerViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = Charger.objects.all()
+    serializer_class = ChargerSerializer
+
+    def get_queryset(self):
+        queryset = Charger.objects.all()
+        lat = self.request.query_params.get('lat')
+        lon = self.request.query_params.get('lon')
+        radius = self.request.query_params.get('radius')
+        connector_status = self.request.query_params.get('connector_status')
+        connector_type = self.request.query_params.get('connector_type')
+
+        if lat and lon:
+            point = Point(float(lon), float(lat))
+            queryset = queryset.annotate(distance=Distance('coordinates', point)).order_by('distance')
+
+            if radius:
+                queryset = queryset.filter(coordinates__distance_lte=(point, radius))
+
+        if connector_status:
+            queryset = queryset.filter(connectors__status=connector_status)
+
+        if connector_type:
+            queryset = queryset.filter(connectors__type=connector_type)
+
+        return queryset
+
+    @action(detail=False, methods=['get'])
+    def search(self, request):
+        query = request.query_params.get('query')
+        queryset = self.get_queryset()
+
+        if query:
+            queryset = queryset.filter(model__icontains=query)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)

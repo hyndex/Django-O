@@ -25,7 +25,7 @@ def send_to_charger(charger_id, action, payload):
         async_to_sync(channel_layer.group_send)(
             group_name,
             {
-                "type": action.lower(),
+                "type": 'action',
                 "payload": payload
             }
         )

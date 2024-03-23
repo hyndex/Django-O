@@ -1,6 +1,5 @@
 # ocpp_app/message_handlers/handle_status_notification.py
 from asgiref.sync import sync_to_async
-from ocpp.v16 import call_result
 from ocpp_app.models import Connector
 
 async def handle_status_notification(payload):
@@ -10,6 +9,7 @@ async def handle_status_notification(payload):
     if connector:
         connector.status = status
         await sync_to_async(connector.save, thread_sensitive=True)()
-        return call_result.StatusNotificationPayload()
+        # Return a dictionary with the response payload
+        return {"status": "Accepted"}
     else:
         raise ValueError("InvalidConnectorId")

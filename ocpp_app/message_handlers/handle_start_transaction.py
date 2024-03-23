@@ -1,6 +1,5 @@
 # ocpp_app/message_handlers/handle_start_transaction.py
 from asgiref.sync import sync_to_async
-from ocpp.v16 import call_result
 from ocpp_app.models import Connector, IdTag, ChargingSession
 
 async def handle_start_transaction(payload):
@@ -9,8 +8,8 @@ async def handle_start_transaction(payload):
     meter_start = payload.get("meterStart")
     timestamp = payload.get("timestamp")
 
-    connector = await sync_to_async(Connector.objects.filter, thread_sensitive=True)(id=connector_id).first()
-    id_tag_obj = await sync_to_async(IdTag.objects.filter, thread_sensitive=True)(idtag=id_tag).first()
+    connector = await sync_to_async(Connector.objects.filter(id=connector_id).first, thread_sensitive=True)()
+    id_tag_obj = await sync_to_async(IdTag.objects.filter(idtag=id_tag).first, thread_sensitive=True)()
 
     if connector and id_tag_obj:
         session = await sync_to_async(ChargingSession.objects.create, thread_sensitive=True)(
@@ -19,6 +18,10 @@ async def handle_start_transaction(payload):
             start_time=timestamp,
             meter_start=meter_start
         )
-        return call_result.StartTransactionPayload(transactionId=session.id, idTagInfo={"status": "Accepted"})
+        return {
+            "transactionId": session.id,
+            "idTagInfo": {"status": "Accepted"}
+        }
     else:
         raise ValueError("InvalidConnectorIdOrIdTag")
+

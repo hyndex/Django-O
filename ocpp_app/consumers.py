@@ -1,113 +1,148 @@
-# ocpp_app/consumers.py
 import json
+import asyncio
+import uuid
 from channels.generic.websocket import AsyncWebsocketConsumer
-from .ocpp_task_manager import OCPPTaskManager
-from .ocpp_message_handler import OCPPMessageHandler
-from asgiref.sync import async_to_sync
-from .models import ChargingSession, MeterValues, IdTag
+from asgiref.sync import sync_to_async
 import logging
+from .message_handlers.handle_authorize import handle_authorize
+from .message_handlers.handle_boot_notification import handle_boot_notification
+from .message_handlers.handle_heartbeat import handle_heartbeat
+from .message_handlers.handle_metervalues import handle_metervalues
+from .message_handlers.handle_start_transaction import handle_start_transaction
+from .message_handlers.handle_status_notification import handle_status_notification
+from .message_handlers.handle_stop_transaction import handle_stop_transaction
+
+from ocpp.v16.enums import Action
 
 logger = logging.getLogger(__name__)
 
 class OCPPConsumer(AsyncWebsocketConsumer):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.groups = []
+        self.handlers = {
+            Action.Authorize: handle_authorize,
+            Action.BootNotification: handle_boot_notification,
+            Action.Heartbeat: handle_heartbeat,
+            Action.MeterValues: handle_metervalues,
+            Action.StartTransaction: handle_start_transaction,
+            Action.StatusNotification: handle_status_notification,
+            Action.StopTransaction: handle_stop_transaction,        
+        }
+        self.action_handlers = {
+            "Authorize": handle_authorize,
+            "BootNotification": handle_boot_notification,
+            "Heartbeat": handle_heartbeat,
+            "MeterValues": handle_metervalues,
+            "StartTransaction": handle_start_transaction,
+            "StatusNotification": handle_status_notification,
+            "StopTransaction": handle_stop_transaction,
+            # Add more action handlers as needed
+        }
+
     connected_chargers = set()
+    pending_calls = {}
 
     async def connect(self):
-        try:
-            self.subprotocol = self.scope.get('subprotocols', [])
-            if 'ocpp1.6j' or 'ocpp1.6' in self.subprotocol:
-                await self.accept(subprotocol=self.subprotocol[0])
-            else:
-                await self.close()
-            self.cpid = self.scope['url_route']['kwargs']['cpid']
-            self.ocpp_task_manager = OCPPTaskManager(self.channel_name)
-            self.ocpp_message_handler = OCPPMessageHandler()
-            # await self.accept()
-            self.connected_chargers.add(self.cpid)
-            logger.info(f"WebSocket connection established for CPID: {self.cpid}")
-        except Exception as e:
-            logger.error(f"Error during WebSocket connection: {e}")
-            await self.close()
-
-    async def disconnect(self, close_code):
-        try:
-            self.connected_chargers.discard(self.cpid)
-            logger.info(f"WebSocket connection closed for CPID: {self.cpid}, close_code: {close_code}")
-        except Exception as e:
-            logger.error(f"Error during WebSocket disconnection: {e}")
-
-    async def receive(self, text_data):
-        try:
-            message = json.loads(text_data)
-            message_type = message[0]
-
-            if message_type == 2:  # CALL
-                response = await self.ocpp_message_handler.handle_message(message)
-                await self.send(response)
-            elif message_type == 3:  # CALLRESULT
-                self.ocpp_task_manager.handle_call_result(message[1], message[2])
-            elif message_type == 4:  # CALLERROR
-                self.ocpp_task_manager.handle_call_error(message[1], message[2], message[3], message[4])
-
-            logger.info(f"Received message: {message}")
-        except Exception as e:
-            logger.error(f"Error during WebSocket message processing: {e}")
-            await self.close()
-
-
-
-
-class MeterValueConsumer(AsyncWebsocketConsumer):
-    async def connect(self):
-        self.user = self.scope["user"]
-        self.group_name = f"meter_values_user_{self.user.id}"
-
-        # Find the ongoing charging session for the user
-        id_tags = IdTag.objects.filter(user=self.user)
-        self.charging_session = None
-        for id_tag in id_tags:
-            session = ChargingSession.objects.filter(id_tag=id_tag, end_time__isnull=True).first()
-            if session:
-                self.charging_session = session
-                break
-
-        if self.charging_session:
-            # Join the group
-            await self.channel_layer.group_add(
-                self.group_name,
-                self.channel_name
-            )
-
-            await self.accept()
+        self.subprotocol = self.scope.get('subprotocols', [])
+        if 'ocpp1.6j' in self.subprotocol or 'ocpp1.6' in self.subprotocol:
+            await self.accept(subprotocol=self.subprotocol[0])
         else:
             await self.close()
+        self.cpid = self.scope['url_route']['kwargs']['cpid']
+        self.connected_chargers.add(self.cpid)
+        logger.info(f"Connected charger: {self.cpid}")
 
     async def disconnect(self, close_code):
-        if self.charging_session:
-            # Leave the group
-            await self.channel_layer.group_discard(
-                self.group_name,
-                self.channel_name
-            )
+        self.connected_chargers.discard(self.cpid)
+        logger.info(f"Disconnected charger: {self.cpid}")
 
     async def receive(self, text_data):
-        text_data_json = json.loads(text_data)
-        message = text_data_json["message"]
+        message = json.loads(text_data)
+        message_type, message_id = message[0], message[1]
 
-        # Send message to group
-        await self.channel_layer.group_send(
-            self.group_name,
-            {
-                "type": "meter_values_message",
-                "message": message
-            }
-        )
+        try:
+            if message_type == 2:  # CALL
+                action = message[2]
+                payload = message[3]
+                response = await self.handle_call(message_id, action, payload)
+                if response:
+                    await self.send(json.dumps([3, message_id, response]))
+            elif message_type == 3:  # CALLRESULT
+                await self.handle_call_result(message)
+            elif message_type == 4:  # CALLERROR
+                await self.handle_call_error(message)
+        except Exception as e:
+            logger.error(f"Error processing message: {e}")
 
-    # Receive message from the group
-    async def meter_values_message(self, event):
-        message = event["message"]
+    async def handle_call(self, message_id, action, payload):
+        # handler = getattr(self, f'handle_{action.lower()}', None)
+        handler = self.action_handlers.get(action)
+        if handler:
+            return await handler(payload)
+        else:
+            logger.warning(f"Unknown action: {action}")
+            return None
 
-        # Send message to WebSocket
-        await self.send(text_data=json.dumps({
-            "message": message
-        }))
+    async def handle_call_result(self, message):
+        message_id = message[1]
+        if message_id in self.pending_calls:
+            future = self.pending_calls[message_id]
+            future.set_result(message[2])
+            del self.pending_calls[message_id]
+        else:
+            logger.warning(f"Received CALLRESULT for unknown message ID: {message_id}")
+
+    async def handle_call_error(self, message):
+        message_id = message[1]
+        if message_id in self.pending_calls:
+            future = self.pending_calls[message_id]
+            future.set_exception(Exception(f"CALLERROR: {message[2]} - {message[3]}"))
+            del self.pending_calls[message_id]
+        else:
+            logger.warning(f"Received CALLERROR for unknown message ID: {message_id}")
+
+    async def send_call_message_and_await_response(self, action, payload):
+        message_id = str(uuid.uuid4())
+        call_message = [2, message_id, action, payload]
+        future = asyncio.Future()
+        self.pending_calls[message_id] = future
+
+        await self.send(json.dumps(call_message))
+        try:
+            response_payload = await asyncio.wait_for(future, timeout=60)  # Wait for 60 seconds
+            return response_payload
+        except asyncio.TimeoutError:
+            logger.error(f"Timeout waiting for response to message ID: {message_id}")
+            del self.pending_calls[message_id]
+            raise
+
+    # Handler for RemoteStartTransaction
+    async def handle_remotestarttransaction(self, payload):
+        response = await self.send_call_message_and_await_response("RemoteStartTransaction", payload)
+        return response
+
+    # Handler for RemoteStopTransaction
+    async def handle_remotestoptransaction(self, payload):
+        response = await self.send_call_message_and_await_response("RemoteStopTransaction", payload)
+        return response
+
+    # Handler for GetConfiguration
+    async def handle_getconfiguration(self, payload):
+        response = await self.send_call_message_and_await_response("GetConfiguration", payload)
+        return response
+
+    # Handler for SetConfiguration
+    async def handle_setconfiguration(self, payload):
+        response = await self.send_call_message_and_await_response("SetConfiguration", payload)
+        return response
+
+    # Handler for ClearCache
+    async def handle_clearcache(self, payload):
+        response = await self.send_call_message_and_await_response("ClearCache", payload)
+        return response
+
+    # Handler for Reset
+    async def handle_reset(self, payload):
+        response = await self.send_call_message_and_await_response("Reset", payload)
+        return response

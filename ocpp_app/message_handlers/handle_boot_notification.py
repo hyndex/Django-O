@@ -1,8 +1,8 @@
 # ocpp_app/message_handlers/handle_boot_notification.py
 from asgiref.sync import sync_to_async
-from ocpp.v16 import call_result
 from ocpp_app.models import Charger
 from datetime import datetime
+from django.utils import timezone
 
 async def handle_boot_notification(payload):
     charger_id = payload.get("chargePointSerialNumber")
@@ -18,8 +18,8 @@ async def handle_boot_notification(payload):
         }
     )
 
-    return call_result.BootNotificationPayload(
-        status="Accepted",
-        currentTime=datetime.now().isoformat(),
-        interval=60
-    )
+    return {
+        "status": "Accepted",
+        "currentTime": timezone.now().isoformat(),
+        "interval": 60
+    }

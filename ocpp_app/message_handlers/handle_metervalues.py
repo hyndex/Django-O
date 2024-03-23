@@ -1,12 +1,11 @@
 # ocpp_app/message_handlers/handle_metervalues.py
 from asgiref.sync import sync_to_async
-from ocpp.v16 import call_result
 from ocpp_app.models import ChargingSession, MeterValues
 
 async def handle_metervalues(payload):
     transaction_id = payload.get("transactionId")
     meter_values = payload.get("MeterValues", [])
-    session = await sync_to_async(ChargingSession.objects.filter, thread_sensitive=True)(transaction_id=transaction_id).first()
+    session = await sync_to_async(ChargingSession.objects.filter(transaction_id=transaction_id).first, thread_sensitive=True)()
 
     if session:
         for meter_value in meter_values:
@@ -23,6 +22,6 @@ async def handle_metervalues(payload):
                     measurand=sampled_value.get("measurand"),
                     location=sampled_value.get("location"),
                 )
-        return call_result.MeterValuesPayload()
+        return {}
     else:
         raise ValueError("InvalidTransactionId")

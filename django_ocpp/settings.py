@@ -221,6 +221,8 @@ UNFOLD = {
     "SITE_ICON": "bolt",  # You can use any Material Icon name here
 }
 
+USE_TZ = True
+TIME_ZONE = 'Asia/Kolkata'
 
 
 # SECURE_SSL_REDIRECT = True

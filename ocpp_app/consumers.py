@@ -16,25 +16,25 @@ from .message_handlers.handle_stop_transaction import handle_stop_transaction
 logger = logging.getLogger(__name__)
 
 class OCPPConsumer(AsyncWebsocketConsumer):
-    # def __init__(self, *args, **kwargs):
-    #     super().__init__(*args, **kwargs)
-    #     self.groups = []
-    #     self.action_handlers = {
-    #         "Authorize": handle_authorize,
-    #         "BootNotification": handle_boot_notification,
-    #         "Heartbeat": handle_heartbeat,
-    #         "MeterValues": handle_metervalues,
-    #         "StartTransaction": handle_start_transaction,
-    #         "StatusNotification": handle_status_notification,
-    #         "StopTransaction": handle_stop_transaction,
-    #         "RemoteStartTransaction": self.handle_remotestarttransaction,
-    #         "RemoteStopTransaction": self.handle_remotestoptransaction,
-    #         "GetConfiguration": self.handle_getconfiguration,
-    #         "SetConfiguration": self.handle_setconfiguration,
-    #         # "ClearCache": self.handle_clearcache,
-    #         "Reset": self.handle_reset,
-    #         # Add more action handlers as needed
-    #     }
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.groups = []
+        self.action_handlers = {
+            "Authorize": handle_authorize,
+            "BootNotification": handle_boot_notification,
+            "Heartbeat": handle_heartbeat,
+            "MeterValues": handle_metervalues,
+            "StartTransaction": handle_start_transaction,
+            "StatusNotification": handle_status_notification,
+            "StopTransaction": handle_stop_transaction,
+            "RemoteStartTransaction": self.remotestarttransaction,
+            "RemoteStopTransaction": self.remotestoptransaction,
+            "GetConfiguration": self.getconfiguration,
+            "SetConfiguration": self.setconfiguration,
+            "ClearCache": self.clearcache,
+            "Reset": self.reset,
+            # Add more action handlers as needed
+        }
 
     connected_chargers = set()
     pending_calls = {}
@@ -61,6 +61,25 @@ class OCPPConsumer(AsyncWebsocketConsumer):
             logger.info(f"Disconnected charger: {self.cpid}")
         except Exception as e:
             logger.error(f"Error during disconnect: {e}")
+
+    # async def receive(self, text_data):
+    #     try:
+    #         logger.info(f"Received message: {text_data}")
+    #         message = json.loads(text_data)
+    #         message_type, message_id = message[0], message[1]
+
+    #         if message_type == 2:  # CALL
+    #             action = message[2]
+    #             payload = message[3]
+    #             response = await self.call(message_id, action, payload)
+    #             if response:
+    #                 await self.send(json.dumps([3, message_id, response]))
+    #         elif message_type == 3:  # CALLRESULT
+    #             await self.call_result(message)
+    #         elif message_type == 4:  # CALLERROR
+    #             await self.call_error(message)
+    #     except Exception as e:
+    #         logger.error(f"Error processing message: {e}")
             
     async def receive(self, text_data):
         try:
@@ -73,9 +92,9 @@ class OCPPConsumer(AsyncWebsocketConsumer):
                 if response and message_type == 2:  # CALL
                     await self.send(json.dumps([3, message_id, response]))
                 elif message_type == 3:  # CALLRESULT
-                    await self.handle_call_result(message)
+                    await self.call_result(message)
                 elif message_type == 4:  # CALLERROR
-                    await self.handle_call_error(message)
+                    await self.call_error(message)
             else:
                 logger.warning(f"No handler for message type: {action}")
                 # Optionally send back an error message to the caller
@@ -137,39 +156,35 @@ class OCPPConsumer(AsyncWebsocketConsumer):
             del self.pending_calls[message_id]
             raise
 
-    async def receive_json(self, content):
-        print("Received message:", content)
-        # Your debugging logic here
-
     # Handler for RemoteStartTransaction
-    async def handle_remotestarttransaction(self, payload):
+    async def remotestarttransaction(self, payload):
         response = await self.send_call_message_and_await_response("RemoteStartTransaction", payload)
         return response
 
     # Handler for RemoteStopTransaction
-    async def handle_remotestoptransaction(self, payload):
+    async def remotestoptransaction(self, payload):
         response = await self.send_call_message_and_await_response("RemoteStopTransaction", payload)
         return response
 
     # Handler for GetConfiguration
-    async def handle_getconfiguration(self, payload):
+    async def getconfiguration(self, payload):
         response = await self.send_call_message_and_await_response("GetConfiguration", payload)
         return response
 
     # Handler for SetConfiguration
-    async def handle_setconfiguration(self, payload):
+    async def setconfiguration(self, payload):
         response = await self.send_call_message_and_await_response("SetConfiguration", payload)
         return response
 
     # Handler for ClearCache
-    async def handle_clearcache(self, payload):
+    async def clearcache(self, payload):
         logger.info("Handling clear cache action")
         response = await self.send_call_message_and_await_response("ClearCache", payload)
         return response
 
 
     # Handler for Reset
-    async def handle_reset(self, payload):
+    async def reset(self, payload):
         response = await self.send_call_message_and_await_response("Reset", payload)
         return response
 

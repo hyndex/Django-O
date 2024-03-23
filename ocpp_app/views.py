@@ -19,20 +19,16 @@ from channels.layers import get_channel_layer
 
 def send_to_charger(charger_id, action, payload):
     channel_layer = get_channel_layer()
-    group_name = f"charger_{charger_id}"
+    group_name = f"charger_{charger_id}"  
     try:
-        # Using group_send to ensure correct group naming and prefix handling
-        async_to_sync(channel_layer.group_send)(
-            group_name,
-            {
-                "type": 'action',
-                "payload": payload
-            }
-        )
+        async_to_sync(channel_layer.group_send)(group_name, {
+            "type": action.lower(),
+            "payload": payload
+        })
         return JsonResponse({"status": "Message sent successfully"})
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
-
+    
 
 class RemoteStartTransactionView(APIView):
     def get(self, request):
@@ -129,7 +125,7 @@ class ClearCacheView(APIView):
 
             return send_to_charger(
                 charger_id,
-                "ClearCache",
+                "clearcache",
                 {}
             )
         return Response(serializer.errors, status=400)

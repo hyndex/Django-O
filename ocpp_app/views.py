@@ -14,19 +14,25 @@ from .serializers import (
     ResetChargerSerializer,
 )
 
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
+
 def send_to_charger(charger_id, action, payload):
     channel_layer = get_channel_layer()
+    group_name = f"charger_{charger_id}"
     try:
-        response = async_to_sync(channel_layer.send)(
-            f"charger_{charger_id}",
+        # Using group_send to ensure correct group naming and prefix handling
+        async_to_sync(channel_layer.group_send)(
+            group_name,
             {
                 "type": action.lower(),
                 "payload": payload
             }
         )
-        return JsonResponse(response)
+        return JsonResponse({"status": "Message sent successfully"})
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
+
 
 class RemoteStartTransactionView(APIView):
     def get(self, request):

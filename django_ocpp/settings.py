@@ -50,14 +50,7 @@ RAZORPAY_KEY_SECRET = os.getenv('RAZORPAY_KEY_SECRET')
 AWS_S3_REGION_NAME = os.getenv('AWS_S3_REGION_NAME')
 WEB_SOCKET_PING_INTERVAL = os.getenv('WEB_SOCKET_PING_INTERVAL')
 
-CHANNEL_LAYERS = {
-    'default': {
-        'BACKEND': 'channels_redis.core.RedisChannelLayer',
-        'CONFIG': {
-            "hosts": [(os.getenv('REDIS_HOST'), int(os.getenv('REDIS_PORT')))],
-        },
-    },
-}
+
 
 
 # Quick-start development settings - unsuitable for production
@@ -89,6 +82,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django.contrib.gis',
+    'channels',
     'rest_framework',
     'django_otp',
     'push_notifications',
@@ -99,7 +93,6 @@ INSTALLED_APPS = [
     'ocpi',
     'stateless',
     'djangoaddicts.pygwalker',
-    'channels',
 ]
 
 
@@ -167,6 +160,18 @@ AUTH_PASSWORD_VALIDATORS = [
         'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
     },
 ]
+
+
+
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            "hosts": [(os.getenv('REDIS_HOST'), int(os.getenv('REDIS_PORT')))],
+        },
+    },
+}
+
 
 
 # Internationalization

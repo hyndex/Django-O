@@ -24,23 +24,6 @@
 # ]
 
 
-
-
-# urls.py
-# from django.urls import path
-# from . import views
-
-# urlpatterns = [
-#     path('remote_start_transaction/', views.remote_start_transaction, name='remote_start_transaction'),
-#     path('remote_stop_transaction/', views.remote_stop_transaction, name='remote_stop_transaction'),
-#     path('get_configuration/', views.get_configuration, name='get_configuration'),
-#     path('set_configuration/', views.set_configuration, name='set_configuration'),
-#     path('clear_cache/', views.clear_cache, name='clear_cache'),
-#     path('reset_charger/', views.reset_charger, name='reset_charger'),
-# ]
-
-
-
 from django.urls import path
 from . import views
 

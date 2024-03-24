@@ -40,6 +40,7 @@ class PaymentInfo(models.Model):
     refund_status = models.CharField(max_length=50, blank=True, null=True)
     email = models.EmailField()
     phone = models.CharField(max_length=15)
+    payment_id = models.CharField(max_length=15)
     notes = models.TextField(blank=True, null=True)
     international = models.BooleanField(default=False)
     fee = models.FloatField(default=0.0)

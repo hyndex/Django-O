@@ -122,6 +122,7 @@ def handle_razorpay_payment_success(request):
             user=user,
             amount=order.amount,
             method='Razorpay',
+            payment_id=payment_id,  # Add the payment ID here
             captured=True,
             email=request.data.get('email', ''),
             phone=request.data.get('phone', ''),

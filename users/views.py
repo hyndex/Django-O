@@ -11,7 +11,10 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.permissions import IsAuthenticated
 from datetime import timedelta, datetime
 from django_otp.oath import TOTP
-
+from django.views.decorators.http import require_POST
+from django.contrib.auth.decorators import login_required
+from django.http import JsonResponse
+import asyncio
 
 import razorpay
 import requests
@@ -26,6 +29,11 @@ from .serializers import (
     WalletSerializer,
 )
 from .utils import send_sms
+
+from ocpp_app.remote_start_queue_manager import RemoteStartQueueManager
+
+# Create an instance of RemoteStartQueueManager
+remote_start_queue_manager = RemoteStartQueueManager()
 
 # Initialize Razorpay client
 razorpay_client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
@@ -403,3 +411,33 @@ def verify_update(request):
         return Response({'message': 'Update successful'})
     else:
         return Response({'error': 'Invalid or expired OTP'}, status=400)
+
+
+
+
+@require_POST
+@login_required
+def remote_start_charge_with_queue(request):
+    cpid = request.POST.get('cpid')
+    connector_id = int(request.POST.get('connectorId'))
+    id_tag = request.POST.get('idTag')
+
+    if remote_start_queue_manager.is_queue_empty():
+        response = asyncio.run(remote_start_queue_manager.start_charging(request.user, cpid, connector_id, id_tag))
+        if response.get('status') == 'Accepted':
+            return JsonResponse({'message': 'Charging session started'})
+        else:
+            return JsonResponse({'error': 'Failed to start charging session'}, status=500)
+    else:
+        position = remote_start_queue_manager.get_user_position(request.user)
+        if position == 0:
+            asyncio.create_task(remote_start_queue_manager.add_to_queue(request.user, cpid, connector_id, id_tag))
+            return JsonResponse({'message': 'Added to remote start queue, you are in position 1'})
+        elif position == 1:
+            response = asyncio.run(remote_start_queue_manager.start_next_in_queue())
+            if response.get('status') == 'Accepted':
+                return JsonResponse({'message': 'Charging session started'})
+            else:
+                return JsonResponse({'error': 'Failed to start charging session'}, status=500)
+        else:
+            return JsonResponse({'message': f'You are in position {position} in the queue'})

@@ -302,31 +302,3 @@ class ChargerViewSet(viewsets.ReadOnlyModelViewSet):
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
     
-
-
-# @require_POST
-# @login_required
-# def remote_start_charge_with_queue(request):
-#     cpid = request.POST.get('cpid')
-#     connector_id = int(request.POST.get('connectorId'))
-#     id_tag = request.POST.get('idTag')
-
-#     if remote_start_queue_manager.is_queue_empty():
-#         response = asyncio.run(remote_start_queue_manager.start_charging(request.user, cpid, connector_id, id_tag))
-#         if response.get('status') == 'Accepted':
-#             return JsonResponse({'message': 'Charging session started'})
-#         else:
-#             return JsonResponse({'error': 'Failed to start charging session'}, status=500)
-#     else:
-#         position = remote_start_queue_manager.get_user_position(request.user)
-#         if position == 0:
-#             asyncio.create_task(remote_start_queue_manager.add_to_queue(request.user, cpid, connector_id, id_tag))
-#             return JsonResponse({'message': 'Added to remote start queue, you are in position 1'})
-#         elif position == 1:
-#             response = asyncio.run(remote_start_queue_manager.start_next_in_queue())
-#             if response.get('status') == 'Accepted':
-#                 return JsonResponse({'message': 'Charging session started'})
-#             else:
-#                 return JsonResponse({'error': 'Failed to start charging session'}, status=500)
-#         else:
-#             return JsonResponse({'message': f'You are in position {position} in the queue'})

@@ -199,7 +199,7 @@ class OTP(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     otp = models.CharField(max_length=6)
     created_at = models.DateTimeField(auto_now_add=True)
-    type = models.CharField(max_length=10, choices=[('phone', 'Phone'), ('email', 'Email')])
+    type = models.CharField(max_length=10, choices=[('phone', 'Phone'), ('email', 'Email'), ('password_reset', 'Password Reset')])
 
     def is_valid(self):
         return timezone.now() - self.created_at < timezone.timedelta(minutes=5)  # OTP is valid for 5 minutes

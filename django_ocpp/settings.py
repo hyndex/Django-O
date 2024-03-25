@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 """
 
 from pathlib import Path
+from datetime import timedelta
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -84,6 +85,7 @@ INSTALLED_APPS = [
     'django.contrib.gis',
     'channels',
     'rest_framework',
+    'rest_framework_simplejwt',
     'django_otp',
     'push_notifications',
     'django_otp.plugins.otp_totp',
@@ -117,7 +119,10 @@ REST_FRAMEWORK = {
     'DEFAULT_THROTTLE_RATES': {
         'anon': '10000/minute',
         'user': '10000/minute'
-    }
+    },
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ),
 }
 
 
@@ -220,6 +225,15 @@ UNFOLD = {
     "SITE_HEADER": "Charger Management",
     "SITE_ICON": "bolt",  # You can use any Material Icon name here
 }
+
+
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=5),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
+    'ROTATE_REFRESH_TOKENS': True,
+}
+
 
 USE_TZ = True
 TIME_ZONE = 'Asia/Kolkata'

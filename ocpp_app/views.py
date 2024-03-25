@@ -16,6 +16,10 @@ from .serializers import (
     SetConfigurationSerializer,
     ClearCacheSerializer,
     ResetChargerSerializer,
+    ChangeAvailabilitySerializer,
+    TriggerMessageSerializer,
+    UpdateFirmwareSerializer,
+    SendLocalListSerializer
 )
 from .serializers import ChargerSerializer
 
@@ -156,6 +160,109 @@ class ResetChargerView(APIView):
         return Response(serializer.errors, status=400)
 
 
+class ChangeAvailabilityView(APIView):
+    def post(self, request):
+        serializer = ChangeAvailabilitySerializer(data=request.data)
+        if serializer.is_valid():
+            charger_id = serializer.validated_data['chargerId']
+            connector_id = serializer.validated_data['connectorId']
+            availability_type = serializer.validated_data['type']
+
+            if charger_id not in OCPPConsumer.connected_chargers or not Charger.objects.filter(charger_id=charger_id).exists():
+                return JsonResponse({'error': 'Charger not connected or invalid'}, status=400)
+
+            return send_to_charger(
+                charger_id,
+                "ChangeAvailability",
+                {
+                    "connectorId": connector_id,
+                    "type": availability_type,
+                }
+            )
+        return Response(serializer.errors, status=400)
+
+
+
+class TriggerMessageView(APIView):
+    def post(self, request):
+        serializer = TriggerMessageSerializer(data=request.data)
+        if serializer.is_valid():
+            charger_id = serializer.validated_data['chargerId']
+            message_type = serializer.validated_data['messageType']
+
+            if charger_id not in OCPPConsumer.connected_chargers or not Charger.objects.filter(charger_id=charger_id).exists():
+                return JsonResponse({'error': 'Charger not connected or invalid'}, status=400)
+
+            return send_to_charger(
+                charger_id,
+                "TriggerMessage",
+                {
+                    "requestedMessage": message_type,
+                }
+            )
+        return Response(serializer.errors, status=400)
+
+
+
+class UpdateFirmwareView(APIView):
+    def post(self, request):
+        serializer = UpdateFirmwareSerializer(data=request.data)
+        if serializer.is_valid():
+            charger_id = serializer.validated_data['chargerId']
+            location = serializer.validated_data['location']
+            retrieve_date = serializer.validated_data['retrieveDate']
+
+            if charger_id not in OCPPConsumer.connected_chargers or not Charger.objects.filter(charger_id=charger_id).exists():
+                return JsonResponse({'error': 'Charger not connected or invalid'}, status=400)
+
+            return send_to_charger(
+                charger_id,
+                "UpdateFirmware",
+                {
+                    "location": location,
+                    "retrieveDate": retrieve_date,
+                }
+            )
+        return Response(serializer.errors, status=400)
+
+
+
+class GetLocalListVersionView(APIView):
+    def get(self, request):
+        charger_id = request.query_params.get('chargerId')
+
+        if charger_id not in OCPPConsumer.connected_chargers or not Charger.objects.filter(charger_id=charger_id).exists():
+            return JsonResponse({'error': 'Charger not connected or invalid'}, status=400)
+
+        return send_to_charger(
+            charger_id,
+            "GetLocalListVersion",
+            {}
+        )
+
+
+class SendLocalListView(APIView):
+    def post(self, request):
+        serializer = SendLocalListSerializer(data=request.data)
+        if serializer.is_valid():
+            charger_id = serializer.validated_data['chargerId']
+            list_version = serializer.validated_data['listVersion']
+            local_authorization_list = serializer.validated_data['localAuthorizationList']
+
+            if charger_id not in OCPPConsumer.connected_chargers or not Charger.objects.filter(charger_id=charger_id).exists():
+                return JsonResponse({'error': 'Charger not connected or invalid'}, status=400)
+
+            return send_to_charger(
+                charger_id,
+                "SendLocalList",
+                {
+                    "listVersion": list_version,
+                    "localAuthorizationList": local_authorization_list,
+                }
+            )
+        return Response(serializer.errors, status=400)
+
+
 
 class ChargerViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Charger.objects.all()
@@ -194,3 +301,32 @@ class ChargerViewSet(viewsets.ReadOnlyModelViewSet):
 
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
+    
+
+
+# @require_POST
+# @login_required
+# def remote_start_charge_with_queue(request):
+#     cpid = request.POST.get('cpid')
+#     connector_id = int(request.POST.get('connectorId'))
+#     id_tag = request.POST.get('idTag')
+
+#     if remote_start_queue_manager.is_queue_empty():
+#         response = asyncio.run(remote_start_queue_manager.start_charging(request.user, cpid, connector_id, id_tag))
+#         if response.get('status') == 'Accepted':
+#             return JsonResponse({'message': 'Charging session started'})
+#         else:
+#             return JsonResponse({'error': 'Failed to start charging session'}, status=500)
+#     else:
+#         position = remote_start_queue_manager.get_user_position(request.user)
+#         if position == 0:
+#             asyncio.create_task(remote_start_queue_manager.add_to_queue(request.user, cpid, connector_id, id_tag))
+#             return JsonResponse({'message': 'Added to remote start queue, you are in position 1'})
+#         elif position == 1:
+#             response = asyncio.run(remote_start_queue_manager.start_next_in_queue())
+#             if response.get('status') == 'Accepted':
+#                 return JsonResponse({'message': 'Charging session started'})
+#             else:
+#                 return JsonResponse({'error': 'Failed to start charging session'}, status=500)
+#         else:
+#             return JsonResponse({'message': f'You are in position {position} in the queue'})

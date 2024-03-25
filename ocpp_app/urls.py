@@ -13,4 +13,10 @@ urlpatterns = [
     path('set_configuration/', views.SetConfigurationView.as_view(), name='set_configuration'),
     path('clear_cache/', views.ClearCacheView.as_view(), name='clear_cache'),
     path('reset_charger/', views.ResetChargerView.as_view(), name='reset_charger'),
+    path('change-availability/', views.ChangeAvailabilityView.as_view(), name='change-availability'),
+    path('trigger-message/', views.TriggerMessageView.as_view(), name='trigger-message'),
+    path('update-firmware/', views.UpdateFirmwareView.as_view(), name='update-firmware'),
+    path('get-local-list-version/', views.GetLocalListVersionView.as_view(), name='get-local-list-version'),
+    path('send-local-list/', views.SendLocalListView.as_view(), name='send-local-list'),
+
 ]

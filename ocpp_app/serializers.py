@@ -41,3 +41,29 @@ class ClearCacheSerializer(serializers.Serializer):
 class ResetChargerSerializer(serializers.Serializer):
     chargerId = serializers.CharField(max_length=100)
     resetType = serializers.ChoiceField(choices=['Hard', 'Soft'])
+
+
+class SendLocalListSerializer(serializers.Serializer):
+    chargerId = serializers.CharField(max_length=20)
+    listVersion = serializers.IntegerField(min_value=1)
+    localAuthorizationList = serializers.ListField(
+        child=serializers.DictField(
+            child=serializers.CharField(max_length=20)
+        )
+    )
+
+class ChangeAvailabilitySerializer(serializers.Serializer):
+    chargerId = serializers.CharField(max_length=20)
+    connectorId = serializers.IntegerField(min_value=0)
+    type = serializers.ChoiceField(choices=['Inoperative', 'Operative'])
+
+
+class TriggerMessageSerializer(serializers.Serializer):
+    chargerId = serializers.CharField(max_length=20)
+    messageType = serializers.ChoiceField(choices=['BootNotification', 'StatusNotification', 'Heartbeat', 'MeterValues', 'FirmwareStatusNotification'])
+
+
+class UpdateFirmwareSerializer(serializers.Serializer):
+    chargerId = serializers.CharField(max_length=20)
+    location = serializers.URLField()
+    retrieveDate = serializers.DateTimeField()

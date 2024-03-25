@@ -20,4 +20,6 @@ from django.urls import path, include
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('ocpp/', include('ocpp_app.urls')),  # Include ocpp_app URLs under the 'ocpp/' prefix
+    path('users/', include('users.urls')),  # Include ocpp_app URLs under the 'ocpp/' prefix
+
 ]

@@ -224,6 +224,9 @@ UNFOLD = {
 USE_TZ = True
 TIME_ZONE = 'Asia/Kolkata'
 
+# APPEND_SLASH=False
+
+
 
 # SECURE_SSL_REDIRECT = True
 # SESSION_COOKIE_SECURE = True

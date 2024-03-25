@@ -25,10 +25,13 @@ from .serializers import (
     UserSerializer,
     WalletSerializer,
 )
-from .utils import send_otp_email, send_otp_sms, send_sms
+from .utils import send_sms
 
 # Initialize Razorpay client
 razorpay_client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
+
+import logging
+from django_otp.oath import TOTP
 
 @api_view(['POST'])
 def send_otp(request):
@@ -41,11 +44,18 @@ def send_otp(request):
     else:
         device = user.totpdevice_set.first()
 
-    otp = TOTP(key=device.bin_key, step=device.step, t0=device.t0, digits=device.digits).generate()
-    # Send OTP to user's phone using your SMS gateway
-    send_sms(phone, f'Your OTP is: {otp}')
+    try:
+        otp = TOTP(key=device.bin_key, step=device.step, t0=device.t0, digits=device.digits).generate()
+        logging.info(f"Generated OTP: {otp}")  # Log the generated OTP
 
-    return Response({'message': 'OTP sent successfully'})
+        # Send OTP to user's phone using your SMS gateway
+        send_sms(phone, f'Your OTP is: {otp}')
+
+        return Response({'message': 'OTP sent successfully'})
+    except Exception as e:
+        logging.error(f"Error sending OTP: {e}")
+        return Response({'error': 'Failed to send OTP'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 @api_view(['POST'])
 def verify_otp(request):
@@ -259,9 +269,9 @@ class ForgotPasswordView(APIView):
         if user:
             otp = OTP.objects.create(user=user)
             if '@' in email_or_phone:
-                send_otp_email(email_or_phone, otp.code)
+                send_mail(email_or_phone, otp.code)
             else:
-                send_otp_sms(email_or_phone, otp.code)
+                send_sms(email_or_phone, otp.code)
             return Response({'message': 'OTP sent to your email or phone'}, status=status.HTTP_200_OK)
         return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
 

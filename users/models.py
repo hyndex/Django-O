@@ -9,6 +9,7 @@ from push_notifications.models import APNSDevice, GCMDevice
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.utils import timezone
+from random import randint
 
 # Assuming WEB_SOCKET_PING_INTERVAL is defined somewhere in your settings
 WEB_SOCKET_PING_INTERVAL = 30
@@ -40,7 +41,7 @@ class PaymentInfo(models.Model):
     refund_status = models.CharField(max_length=50, blank=True, null=True)
     email = models.EmailField()
     phone = models.CharField(max_length=15)
-    payment_id = models.CharField(max_length=15)
+    payment_id = models.CharField(max_length=255)
     notes = models.TextField(blank=True, null=True)
     international = models.BooleanField(default=False)
     fee = models.FloatField(default=0.0)
@@ -172,7 +173,7 @@ class Wallet(models.Model):
         ('COMPLAIN_DEPOSIT', 'Complain Deposit'),
         ('CUSTOMER_DEPOSIT', 'Customer Deposit'),
         ('CHARGE_DEDUCTION', 'Charge Deduction'),
-    ])
+    ], default='CUSTOMER_DEPOSIT')
 
 
 
@@ -184,7 +185,7 @@ class Order(models.Model):
     session_billing = models.ForeignKey(SessionBilling, on_delete=models.CASCADE, related_name='orders', null=True, blank=True)
     wallet = models.ForeignKey(Wallet, on_delete=models.CASCADE, related_name='orders', null=True, blank=True)
     amount = models.FloatField()
-    tax = models.FloatField()
+    tax = models.FloatField(default=0.0)
     gateway_id = models.CharField(max_length=255, blank=True, null=True)
     gateway_name = models.CharField(max_length=255, blank=True, null=True)
     order_serial = models.IntegerField(blank=True, null=True)
@@ -199,10 +200,16 @@ class OTP(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     otp = models.CharField(max_length=6)
     created_at = models.DateTimeField(auto_now_add=True)
+    is_active = models.BooleanField(default=False)
     type = models.CharField(max_length=10, choices=[('phone', 'Phone'), ('email', 'Email')])
 
     def is_valid(self):
         return timezone.now() - self.created_at < timezone.timedelta(minutes=5)  # OTP is valid for 5 minutes
+    
+    # @classmethod
+    # def create_otp(cls, user, type):
+    #     code = str(randint(100000, 999999))
+    #     return cls.objects.create(user=user, code=code, type=type)
 
 
 

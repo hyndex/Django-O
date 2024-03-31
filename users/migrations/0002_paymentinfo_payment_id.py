@@ -13,7 +13,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="paymentinfo",
             name="payment_id",
-            field=models.CharField(default=django.utils.timezone.now, max_length=15),
+            field=models.CharField(default=django.utils.timezone.now, max_length=255),
             preserve_default=False,
         ),
     ]

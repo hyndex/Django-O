@@ -14,7 +14,6 @@ from django_otp.oath import TOTP
 from django.views.decorators.http import require_POST
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
-import asyncio
 from rest_framework_simplejwt.tokens import RefreshToken
 from .serializers import UserSerializer
 from rest_framework.permissions import IsAuthenticated
@@ -23,7 +22,6 @@ from rest_framework.decorators import api_view, permission_classes
 
 
 import razorpay
-import requests
 from random import randint
 
 from .models import Device, OTP, Order, PaymentInfo, Plan, PlanUser, UserProfile, Wallet
@@ -176,6 +174,7 @@ def handle_razorpay_payment_success(request):
     else:
         return Response({'message': 'Payment verification failed'}, status=status.HTTP_400_BAD_REQUEST)
 
+
 @api_view(['POST'])
 @login_required
 def subscribe_to_plan(request):
@@ -231,6 +230,7 @@ def register_device(request):
         serializer.save(user=request.user)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 class WalletViewSet(viewsets.ModelViewSet):
     serializer_class = WalletSerializer
@@ -360,59 +360,6 @@ class VerifyOTPView(APIView):
             otp.save()
             return Response({'message': 'Password reset successfully'}, status=status.HTTP_200_OK)
         return Response({'error': 'Invalid or expired OTP'}, status=status.HTTP_400_BAD_REQUEST)
-
-           
-
-
-# @api_view(['POST'])
-# def send_otp(request):
-#     user = request.user
-#     type = request.data.get('type')
-
-#     if type not in ['phone', 'email']:
-#         return Response({'error': 'Invalid type'}, status=400)
-
-#     otp = str(randint(100000, 999999))
-#     OTP.objects.create(user=user, otp=otp, type=type)
-
-#     if type == 'phone':
-#         phone_number = user.profile.phone_number
-#         # Send OTP to phone using SMS gateway
-#         # Example: requests.post('SMS_GATEWAY_URL', data={'phone': phone_number, 'message': f'Your OTP is: {otp}'})
-#     elif type == 'email':
-#         email = user.email
-#         # Send OTP to email
-#         send_mail(
-#             'Verify your email',
-#             f'Your OTP is: {otp}',
-#             settings.EMAIL_HOST_USER,
-#             [email],
-#             fail_silently=False,
-#         )
-
-#     return Response({'message': 'OTP sent successfully'})
-
-# @api_view(['POST'])
-# def verify_otp(request):
-#     user = request.user
-#     otp = request.data.get('otp')
-#     type = request.data.get('type')
-
-#     if type not in ['phone', 'email']:
-#         return Response({'error': 'Invalid type'}, status=400)
-
-#     otp_object = OTP.objects.filter(user=user, otp=otp, type=type).first()
-
-#     if otp_object and otp_object.is_valid():
-#         if type == 'phone':
-#             user.profile.is_phone_verified = True
-#         elif type == 'email':
-#             user.profile.is_email_verified = True
-#         user.profile.save()
-#         otp_object.delete()
-#         return Response({'message': 'Verification successful'})
-#     else:
-#         return Response({'error': 'Invalid or expired OTP'}, status=400)
 
 
 @api_view(['POST'])

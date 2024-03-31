@@ -1,5 +1,5 @@
 from django.http import JsonResponse
-from .models import Charger, IPLog
+from .models import OEMCharger, IPLog
 from .utils import verify_signature
 import base64
 
@@ -10,8 +10,8 @@ def log_ip(request):
     signature = base64.b64decode(request.POST.get('signature', ''))
 
     try:
-        charger = Charger.objects.get(unique_id=unique_id)
-    except Charger.DoesNotExist:
+        charger = OEMCharger.objects.get(unique_id=unique_id)
+    except OEMCharger.DoesNotExist:
         return JsonResponse({'status': 'error', 'message': 'Charger not found'}, status=404)
 
     data = f"{ip_address}|{firmware_version}"

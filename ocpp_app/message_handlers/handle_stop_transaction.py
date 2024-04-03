@@ -8,12 +8,14 @@ async def handle_stop_transaction(payload):
     timestamp = payload.get("timestamp")
     reason = payload.get("reason")
 
-    session = await sync_to_async(ChargingSession.objects.filter(transaction_id=transaction_id).first, thread_sensitive=True)()
+    session = await sync_to_async(ChargingSession.objects.filter(transaction_id=transaction_id, meter_stop=None).first, thread_sensitive=True)()
 
     if session:
+        if(meter_stop<session.meter_start):
+            meter_stop = session.meter_start
         session.end_time = timestamp
         session.meter_stop = meter_stop
-        session.reason = reason
+        session.reason = reason or 'Other'
         await sync_to_async(session.save, thread_sensitive=True)()
         return {"idTagInfo": {"status": "Accepted"}}
     else:

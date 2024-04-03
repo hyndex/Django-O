@@ -34,7 +34,7 @@ from .serializers import (
 )
 from .utils import send_sms
 
-from ocpp_app.remote_start_queue_manager import RemoteStartQueueManager
+from ocpp_app.queue_manager import RemoteStartQueueManager
 
 # Create an instance of RemoteStartQueueManager
 remote_start_queue_manager = RemoteStartQueueManager()

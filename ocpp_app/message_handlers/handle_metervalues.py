@@ -1,10 +1,11 @@
 # ocpp_app/message_handlers/handle_metervalues.py
 from asgiref.sync import sync_to_async
 from ocpp_app.models import ChargingSession, MeterValues
+from django.utils import timezone
 
 async def handle_metervalues(payload):
     transaction_id = payload.get("transactionId")
-    meter_values = payload.get("MeterValues", [])
+    meter_values = payload.get("meterValue", [])
     session = await sync_to_async(ChargingSession.objects.filter(transaction_id=transaction_id).first, thread_sensitive=True)()
 
     if session:
@@ -22,6 +23,6 @@ async def handle_metervalues(payload):
                     measurand=sampled_value.get("measurand"),
                     location=sampled_value.get("location"),
                 )
-        return {}
+        return {"currentTime": timezone.now().isoformat()}
     else:
         raise ValueError("InvalidTransactionId")

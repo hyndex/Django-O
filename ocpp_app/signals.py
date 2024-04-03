@@ -5,7 +5,7 @@ from users.models import SessionBilling
 
 @receiver(post_save, sender=SessionBilling)
 def create_commission_payment(sender, instance, created, **kwargs):
-    if created:
+    if created and instance.amount_consumed != None and instance.session.connector.charger.charger_commission_group.commission != None:
         # Calculate the commission amount based on the amount consumed
         commission_amount = instance.amount_consumed * instance.session.connector.charger.charger_commission_group.commission / 100
 
@@ -17,3 +17,5 @@ def create_commission_payment(sender, instance, created, **kwargs):
                 session_billing=instance,
                 charger_commission_member=member
             )
+
+

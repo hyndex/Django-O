@@ -34,14 +34,14 @@ class PaymentInfo(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     order = models.ForeignKey('Order', on_delete=models.CASCADE, related_name='order_payment_info', null=True, blank=True)
     amount = models.FloatField()
-    method = models.CharField(max_length=255)
-    captured = models.BooleanField(default=False)
+    method = models.CharField(max_length=255, default='WALLET')
+    captured = models.BooleanField(default=True)
     refund = models.FloatField(default=0.0)
     refund_to_wallet = models.FloatField(default=0.0)
     refund_status = models.CharField(max_length=50, blank=True, null=True)
-    email = models.EmailField()
-    phone = models.CharField(max_length=15)
-    payment_id = models.CharField(max_length=255)
+    email = models.EmailField(blank=True, null=True)
+    phone = models.CharField(max_length=15, blank=True, null=True)
+    payment_id = models.CharField(max_length=255, blank=True, null=True)
     notes = models.TextField(blank=True, null=True)
     international = models.BooleanField(default=False)
     fee = models.FloatField(default=0.0)
@@ -49,8 +49,8 @@ class PaymentInfo(models.Model):
     tax_description = models.TextField(blank=True, null=True)
     error_code = models.CharField(max_length=50, blank=True, null=True)
     error_description = models.TextField(blank=True, null=True)
-    currency = models.CharField(max_length=3)
-    status = models.CharField(max_length=50)
+    currency = models.CharField(max_length=3, default='INR')
+    status = models.CharField(max_length=50, default='PAID')
 
 
 # SessionBilling Model
@@ -58,14 +58,14 @@ class SessionBilling(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     session = models.ForeignKey('ocpp_app.ChargingSession', on_delete=models.CASCADE, related_name='billings')
     amount_added = models.FloatField()
-    amount_consumed = models.FloatField()
-    amount_refunded = models.FloatField()
-    time_added = models.FloatField()
-    time_consumed = models.FloatField()
-    time_refunded = models.FloatField()
+    amount_consumed = models.FloatField(blank=True, null=True)
+    amount_refunded = models.FloatField(blank=True, null=True)
+    time_added = models.FloatField(blank=True, null=True)
+    time_consumed = models.FloatField(blank=True, null=True)
+    time_refunded = models.FloatField(blank=True, null=True)
     kwh_added = models.FloatField()
-    kwh_consumed = models.FloatField()
-    kwh_refunded = models.FloatField()
+    kwh_consumed = models.FloatField(blank=True, null=True)
+    kwh_refunded = models.FloatField(blank=True, null=True)
 
 
 # Charging Plan Model
@@ -218,3 +218,6 @@ def create_or_update_user_profile(sender, instance, created, **kwargs):
     if created:
         UserProfile.objects.create(user=instance)
     instance.profile.save()
+
+
+

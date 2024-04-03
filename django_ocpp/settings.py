@@ -53,6 +53,7 @@ WEB_SOCKET_PING_INTERVAL = os.getenv('WEB_SOCKET_PING_INTERVAL')
 
 REDIS_HOST = os.getenv('REDIS_HOST')
 REDIS_PORT = int(os.getenv('REDIS_PORT'))
+REDIS_URL = f'redis://{REDIS_HOST}:{REDIS_PORT}'
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/

@@ -20,8 +20,6 @@ class PartnerCommissionMember(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     commission = models.FloatField(default=0)
     commission_type = models.CharField(max_length=255, default='PERCENT')
-    max_amount = models.FloatField()
-    min_amount = models.FloatField()
     min_threshold = models.FloatField()
     status = models.CharField(max_length=255, default='ACTIVE')
     created_at = models.DateTimeField(auto_now_add=True)
@@ -103,6 +101,25 @@ class UserPartnerEmployeeList(models.Model):
     last_name = models.CharField(max_length=255, null=True, blank=True)
     email = models.CharField(max_length=255, null=True, blank=True)
 
+
+# Charging Plan Model
+class PartnerCommissionMemberGroupPlan(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    percent_discount_enable = models.BooleanField(default=True)
+    price = models.FloatField()
+    monthly_kwh_limit = models.FloatField()
+    is_active = models.BooleanField(default=True)
+    type = models.CharField(max_length=50, default='CHARGING')
+
+
+# PlanUser Model
+class PlanPartnerEmployeeList(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    partner_employee_list = models.ForeignKey(PartnerEmployeeList, on_delete=models.CASCADE, related_name='plan_users')
+    plan = models.ForeignKey(PartnerCommissionMemberGroupPlan, on_delete=models.CASCADE, related_name='plan_users')
+    expiry = models.DateTimeField()
+    active = models.BooleanField(default=True)
+    date_created = models.DateTimeField(auto_now_add=True)
 
 
 # Commission Payment Model

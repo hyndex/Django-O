@@ -22,6 +22,11 @@ from .serializers import (
     SendLocalListSerializer
 )
 from .serializers import ChargerSerializer
+import aioredis
+from django.conf import settings
+import json
+
+redis = aioredis.from_url(f"redis://{settings.REDIS_HOST}:{settings.REDIS_PORT}", encoding="utf-8", decode_responses=True)
 
 
 from asgiref.sync import async_to_sync
@@ -58,6 +63,18 @@ class RemoteStartTransactionView(APIView):
             if not IdTag.objects.filter(idtag=id_tag).exists():
                 return JsonResponse({'error': 'Invalid ID tag'}, status=400)
 
+
+            limit = serializer.validated_data.get('limit')
+            limit_type = serializer.validated_data.get('limitType')
+            
+            # Create a unique key for each charging session request to store limit and limit type temporarily
+            redis_key = f"charging:{charger_id}:{connector_id}:{id_tag}"
+            limit_info = json.dumps({'limit': limit, 'limit_type': limit_type})
+            
+            # Store the limit and limit type in Redis with an expiration time
+            async_to_sync(redis.set)(redis_key, limit_info, ex=60)  # Expires in 60 seconds
+            
+            # Assuming send_to_charger is properly implemented to handle synchronous code
             return send_to_charger(
                 charger_id,
                 "RemoteStartTransaction",
@@ -65,7 +82,7 @@ class RemoteStartTransactionView(APIView):
                     "connectorId": connector_id,
                     "idTag": id_tag,
                 }
-            )
+            )            
         return Response(serializer.errors, status=400)
 
 class RemoteStopTransactionView(APIView):
@@ -302,3 +319,59 @@ class ChargerViewSet(viewsets.ReadOnlyModelViewSet):
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
     
+
+
+from django.http import JsonResponse
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from django.core.exceptions import ObjectDoesNotExist
+from asgiref.sync import sync_to_async
+
+from .serializers import RemoteStartTransactionSerializer
+from .queue_manager import RemoteStartQueueManager
+from .models import Charger, Connector, IdTag
+
+# Initialize your RemoteStartQueueManager
+queue_manager = RemoteStartQueueManager()
+
+class StartChargingView(APIView):
+    async def post(self, request):
+        serializer = RemoteStartTransactionSerializer(data=request.data)
+        if serializer.is_valid():
+            charger_id = serializer.validated_data['chargerId']
+            connector_id = serializer.validated_data['connectorId']
+            id_tag = serializer.validated_data['idTag']
+
+            # Check for charger connectivity and availability
+            try:
+                charger = await sync_to_async(Charger.objects.get)(charger_id=charger_id)
+                if not charger.enabled or not charger.online:
+                    return JsonResponse({'error': 'Charger is not online or not enabled.'}, status=400)
+            except ObjectDoesNotExist:
+                return JsonResponse({'error': 'Charger not found.'}, status=404)
+
+            try:
+                connector = await sync_to_async(Connector.objects.get)(charger=charger, connector_id=connector_id)
+                if connector.status != 'Available':
+                    return JsonResponse({'error': 'Connector is not available.'}, status=400)
+            except ObjectDoesNotExist:
+                return JsonResponse({'error': 'Connector not found.'}, status=404)
+
+            try:
+                idtag = await sync_to_async(IdTag.objects.get)(idtag=id_tag)
+            except ObjectDoesNotExist:
+                return JsonResponse({'error': 'ID tag is invalid or not found.'}, status=404)
+
+            # Manage the charging queue
+            queue_status = await queue_manager.add_to_queue(request.user.id, charger_id, connector_id, id_tag)
+
+            if queue_status == 'added':
+                return JsonResponse({'message': 'You have been added to the charging queue. You will be notified when it is your turn.'}, status=202)
+            elif queue_status == 'full':
+                return JsonResponse({'error': 'The charging queue is currently full. Please try again later.'}, status=429)
+            elif queue_status == 'active':
+                return JsonResponse({'message': 'Charging is starting for your vehicle.'}, status=200)
+            else:
+                return JsonResponse({'error': 'Unexpected error occurred. Please try again.'}, status=500)
+
+        return Response(serializer.errors, status=400)

@@ -1,10 +1,10 @@
 from django.db.models import Q
-from ocpp_app.models import MeterValue, ChargingSession
+from ocpp_app.models import MeterValues, ChargingSession
 import datetime
 
 def meter_value_check_stop_transaction(charging_session_id):
     try:
-        meter_values = MeterValue.objects.filter(
+        meter_values = MeterValues.objects.filter(
             charging_session_id=charging_session_id,
             unit__in=['Wh', 'kWh']
         ).select_related('charging_session')

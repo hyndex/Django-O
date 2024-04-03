@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from django.db.models import Q
-from ocpp_app.models import ChargingSession, MeterValue
+from ocpp_app.models import ChargingSession, MeterValues
 from django.conf import settings
 from django.db import transaction
 
@@ -19,14 +19,14 @@ def check_for_meter_value_timeout():
         for session in sessions:
             try:
                 # Find the latest meter value for the session
-                meter_value = MeterValue.objects.filter(
+                meter_value = MeterValues.objects.filter(
                     charging_session=session,
                     unit__in=['kWh', 'Wh']
                 ).order_by('-timestamp').first()
 
                 if not meter_value:
                     # If no meter value is found, create a default one
-                    meter_value = MeterValue(
+                    meter_value = MeterValues(
                         charging_session=session,
                         measurand='Energy.Active.Export.Interval',
                         unit='Wh',

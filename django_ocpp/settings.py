@@ -55,6 +55,9 @@ REDIS_HOST = os.getenv('REDIS_HOST')
 REDIS_PORT = int(os.getenv('REDIS_PORT'))
 REDIS_URL = f'redis://{REDIS_HOST}:{REDIS_PORT}'
 
+
+
+
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 
@@ -227,6 +230,16 @@ SIMPLE_JWT = {
     'SLIDING_TOKEN_REFRESH_EXP_CLAIM': 'refresh_exp',
     'SLIDING_TOKEN_LIFETIME': timedelta(minutes=60),
     'SLIDING_TOKEN_REFRESH_LIFETIME': timedelta(days=1),
+}
+
+
+
+CELERY_BROKER_URL = f'{REDIS_URL}/1'  # Adjust this if you're using a different broker
+CELERY_BEAT_SCHEDULE = {
+    'check_for_meter_value_timeout_every_5_minutes': {
+        'task': 'ocpp_app.tasks.task_check_for_meter_value_timeout',
+        'schedule': 300.0,  # Run every 5 minutes
+    },
 }
 
 

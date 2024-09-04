@@ -97,7 +97,6 @@ INSTALLED_APPS = [
     'partners',
     'users',
     'ocpi',
-    'stateless',
     'djangoaddicts.pygwalker',
 ]
 

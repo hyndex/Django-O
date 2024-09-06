@@ -4,47 +4,53 @@ from django.contrib.auth.models import User
 from django.core.mail import send_mail
 from django_otp.plugins.otp_totp.models import TOTPDevice
 from rest_framework import generics, permissions, status, viewsets
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework.permissions import IsAuthenticated
-from datetime import timedelta, datetime
 from django_otp.oath import TOTP
 from django.views.decorators.http import require_POST
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
-from rest_framework_simplejwt.tokens import RefreshToken
-from .serializers import UserSerializer
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.decorators import api_view, permission_classes
-
-
-
-import razorpay
-from random import randint
-
+from datetime import timedelta, datetime
+from .serializers import UserSerializer, ChangePasswordSerializer, DeviceSerializer, OrderSerializer, WalletSerializer
 from .models import Device, OTP, Order, PaymentInfo, Plan, PlanUser, UserProfile, Wallet
-from .serializers import (
-    ChangePasswordSerializer,
-    DeviceSerializer,
-    OrderSerializer,
-    UserSerializer,
-    WalletSerializer,
-)
+from payments import get_payment_model
 from .utils import send_sms
-
 from ocpp_app.queue_manager import RemoteStartQueueManager
+from random import randint
+import logging
+from rest_framework.permissions import IsAuthenticated
 
 # Create an instance of RemoteStartQueueManager
 remote_start_queue_manager = RemoteStartQueueManager()
 
-# Initialize Razorpay client
-razorpay_client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
+# Payments model
+Payment = get_payment_model()
 
-import logging
-from django_otp.oath import TOTP
+# Helper function for creating a payment using tenant-specific payment settings
+def create_payment(tenant, amount, description, payment_method, user_email):
+    # Get tenant-specific payment variants
+    payment_variants = settings.get_payment_variants(tenant)
 
+    # Check if the specified payment method exists for the tenant
+    if payment_method not in payment_variants:
+        raise ValueError(f"Payment method {payment_method} not available for this tenant.")
+
+    # Set the default currency or use tenant's currency
+    currency = tenant.currency
+
+    # Create the payment object using the tenant's payment variant
+    payment = Payment.objects.create(
+        variant=payment_method,
+        description=description,
+        total=amount,
+        currency=currency,
+        billing_email=user_email,
+    )
+    return payment.get_process_url()
+
+# OTP functionality
 @api_view(['POST'])
 def send_otp(request):
     phone = request.data.get('phone')
@@ -58,11 +64,8 @@ def send_otp(request):
 
     try:
         otp = TOTP(key=device.bin_key, step=device.step, t0=device.t0, digits=device.digits).token()
-        logging.info(f"Generated OTP: {otp}")  # Log the generated OTP
-
-        # Send OTP to user's phone using your SMS gateway
+        logging.info(f"Generated OTP: {otp}")
         send_sms(phone, f'Your OTP is: {otp}')
-
         return Response({'message': 'OTP sent successfully'})
     except Exception as e:
         logging.error(f"Error sending OTP: {e}")
@@ -77,81 +80,61 @@ def verify_otp(request):
     if user:
         device = user.totpdevice_set.first()
         if device and device.verify_token(otp):
-            # Generate JWT tokens
             refresh = RefreshToken.for_user(user)
             access_token = refresh.access_token
             user.profile.is_phone_verified = True
             user.profile.save()
-            # Serialize user data
             user_data = UserSerializer(user).data
-
             return Response({
                 'refresh_token': str(refresh),
                 'access_token': str(access_token),
                 'user': user_data,
                 'message': 'Login successful'
             })
-        else:
-            return Response({'message': 'Invalid OTP'}, status=status.HTTP_400_BAD_REQUEST)
-    else:
-        return Response({'message': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+        return Response({'message': 'Invalid OTP'}, status=status.HTTP_400_BAD_REQUEST)
+    return Response({'message': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
 
-
+# Payment functionality
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def create_wallet_deposit_order(request):
     user = request.user
     amount = request.data.get('amount')
+    tenant = request.tenant
 
-    # Create a Razorpay order
-    razorpay_order = razorpay_client.order.create({
-        'amount': int(amount) * 100,  # Amount in paisa
-        'currency': 'INR',
-        'payment_capture': '1'
-    })
+    # Create payment using tenant's preferred gateway
+    payment_url = create_payment(tenant, amount, "Wallet Deposit", "razorpay", user.email)
 
     # Create an Order record in the database
     order = Order.objects.create(
         user=user,
         amount=amount,
-        gateway_id=razorpay_order['id'],
+        gateway_id=payment_url,  # Save the payment process URL
         gateway_name='Razorpay',
         type='Wallet Deposit',
         status='Pending'
     )
 
     return Response({
-        'razorpay_order_id': razorpay_order['id'],
-        'razorpay_key_id': settings.RAZORPAY_KEY_ID,
+        'payment_url': payment_url,
         'amount': amount
     })
 
-
-
 @api_view(['POST'])
-def handle_razorpay_payment_success(request):
+def handle_payment_success(request):
     user = request.user
-    payment_id = request.data.get('razorpay_payment_id')
-    razorpay_order_id = request.data.get('razorpay_order_id')
-    signature = request.data.get('razorpay_signature')
+    payment_id = request.data.get('payment_id')
+    gateway_name = request.data.get('gateway_name')
 
-    # Fetch the order using the Razorpay order ID
-    order = Order.objects.get(gateway_id=razorpay_order_id, user=user)
+    # Fetch the order using the gateway name and payment ID
+    order = Order.objects.filter(gateway_id=payment_id, user=user).first()
 
-    # Verify the payment signature
-    params_dict = {
-        'razorpay_order_id': razorpay_order_id,
-        'razorpay_payment_id': payment_id,
-        'razorpay_signature': signature
-    }
-    result = razorpay_client.utility.verify_payment_signature(params_dict)
-
-    if result:
+    if order:
         # Update the order status
         order.status = 'Paid'
         order.save()
 
-        # Update the user's wallet
+        # Update user's wallet
         wallet, created = Wallet.objects.get_or_create(user=order.user)
         wallet.balance += order.amount
         wallet.save()
@@ -161,20 +144,18 @@ def handle_razorpay_payment_success(request):
             order=order,
             user=user,
             amount=order.amount,
-            method='Razorpay',
-            payment_id=payment_id,  # Add the payment ID here
+            method=gateway_name,
+            payment_id=payment_id,
             captured=True,
             email=request.data.get('email', ''),
             phone=request.data.get('phone', ''),
             currency='INR',
             status='Paid'
         )
-
         return Response({'message': 'Payment successful'})
-    else:
-        return Response({'message': 'Payment verification failed'}, status=status.HTTP_400_BAD_REQUEST)
+    return Response({'message': 'Order not found'}, status=status.HTTP_404_NOT_FOUND)
 
-
+# Plan subscription
 @api_view(['POST'])
 @login_required
 def subscribe_to_plan(request):
@@ -189,7 +170,6 @@ def subscribe_to_plan(request):
         expiry=datetime.now() + timedelta(days=plan.plan_renewal_interval),
         validity=plan.plan_renewal_interval
     )
-
     return Response({'message': 'Subscribed to plan successfully'})
 
 @api_view(['POST'])
@@ -198,30 +178,27 @@ def pay_subscription(request):
     user = request.user
     plan_user_id = request.data.get('plan_user_id')
     plan_user = PlanUser.objects.get(id=plan_user_id, user=user)
+    tenant = request.tenant
 
-    # Create a Razorpay order for the subscription payment
-    razorpay_order = razorpay_client.order.create({
-        'amount': int(plan_user.plan.price) * 100,  # Amount in paisa
-        'currency': 'INR',
-        'payment_capture': '1'
-    })
+    # Create payment using tenant's preferred gateway
+    payment_url = create_payment(tenant, plan_user.plan.price, "Subscription", "razorpay", user.email)
 
     # Create an Order record in the database
     order = Order.objects.create(
         user=user,
         amount=plan_user.plan.price,
-        gateway_id=razorpay_order['id'],
+        gateway_id=payment_url,
         gateway_name='Razorpay',
         type='Subscription',
         status='Pending'
     )
 
     return Response({
-        'razorpay_order_id': razorpay_order['id'],
-        'razorpay_key_id': settings.RAZORPAY_KEY_ID,
+        'payment_url': payment_url,
         'amount': plan_user.plan.price
     })
 
+# Device registration
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def register_device(request):
@@ -231,7 +208,7 @@ def register_device(request):
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-
+# Wallet and Order viewsets
 class WalletViewSet(viewsets.ModelViewSet):
     serializer_class = WalletSerializer
     permission_classes = [IsAuthenticated]
@@ -246,7 +223,7 @@ class OrderViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         return Order.objects.filter(user=self.request.user)
 
-# View for user profile
+# User profile management
 class UserProfileView(generics.RetrieveUpdateAPIView):
     serializer_class = UserSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -254,7 +231,7 @@ class UserProfileView(generics.RetrieveUpdateAPIView):
     def get_object(self):
         return self.request.user
 
-# View for deleting user account
+# Account deletion
 class DeleteAccountView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -263,7 +240,7 @@ class DeleteAccountView(APIView):
         user.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-# View for refreshing JWT token
+# JWT token management
 class RefreshTokenView(APIView):
     def post(self, request):
         refresh_token = request.data.get('refresh')
@@ -275,15 +252,10 @@ class RefreshTokenView(APIView):
                 return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
         return Response({'error': 'No refresh token provided'}, status=status.HTTP_400_BAD_REQUEST)
 
-# View for setting new passwordfrom rest_framework import generics, permissions, status
-# from rest_framework.response import Response
-# from django.contrib.auth.models import User
-# from .serializers import ChangePasswordSerializer
-
+# Password management
 class SetPasswordView(generics.UpdateAPIView):
     serializer_class = ChangePasswordSerializer
     permission_classes = [permissions.IsAuthenticated]
-    model = User
 
     def get_object(self, queryset=None):
         return self.request.user
@@ -293,33 +265,23 @@ class SetPasswordView(generics.UpdateAPIView):
         serializer = self.get_serializer(data=request.data)
 
         if serializer.is_valid():
-            # Check if the user has a usable password
-            if self.object.has_usable_password():
-                # Check old password
-                if not self.object.check_password(serializer.data.get("old_password")):
-                    return Response({"old_password": ["Wrong password."]}, status=status.HTTP_400_BAD_REQUEST)
-            # Set new password
+            if self.object.has_usable_password() and not self.object.check_password(serializer.data.get("old_password")):
+                return Response({"old_password": ["Wrong password."]}, status=status.HTTP_400_BAD_REQUEST)
             self.object.set_password(serializer.data.get("new_password"))
             self.object.save()
             return Response({"message": "Password updated successfully"}, status=status.HTTP_200_OK)
-
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-
-# View for login with password
+# Login functionality
 class LoginWithPasswordView(APIView):
     def post(self, request):
         username = request.data.get('username')
         password = request.data.get('password')
         user = authenticate(username=username, password=password)
         if user:
-            # Generate JWT tokens
             refresh = RefreshToken.for_user(user)
             access_token = refresh.access_token
-
-            # Serialize user data
             user_data = UserSerializer(user).data
-
             return Response({
                 'refresh_token': str(refresh),
                 'access_token': str(access_token),
@@ -328,7 +290,7 @@ class LoginWithPasswordView(APIView):
             }, status=status.HTTP_200_OK)
         return Response({'error': 'Invalid credentials'}, status=status.HTTP_400_BAD_REQUEST)
 
-# View for forgot password
+# Forgot password functionality
 class ForgotPasswordView(APIView):
     def post(self, request):
         email_or_phone = request.data.get('email_or_phone')
@@ -336,7 +298,6 @@ class ForgotPasswordView(APIView):
 
         if user:
             code = str(randint(100000, 999999))
-
             otp = OTP.objects.create(user=user, otp=code)
             if '@' in email_or_phone:
                 send_mail(email_or_phone, otp.otp)
@@ -345,7 +306,7 @@ class ForgotPasswordView(APIView):
             return Response({'message': 'OTP sent to your email or phone'}, status=status.HTTP_200_OK)
         return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
 
-# View for verify OTP and set new password
+# Verify OTP for password reset
 class VerifyOTPView(APIView):
     def post(self, request):
         otp_code = request.data.get('otp')
@@ -356,12 +317,12 @@ class VerifyOTPView(APIView):
             user = otp.user
             user.set_password(new_password)
             user.save()
-            otp.is_active = False  # Deactivate OTP after use
+            otp.is_active = False
             otp.save()
             return Response({'message': 'Password reset successfully'}, status=status.HTTP_200_OK)
         return Response({'error': 'Invalid or expired OTP'}, status=status.HTTP_400_BAD_REQUEST)
 
-
+# Phone and email updates
 @api_view(['POST'])
 def update_phone(request):
     user = request.user
@@ -372,9 +333,7 @@ def update_phone(request):
 
     otp = str(randint(100000, 999999))
     OTP.objects.create(user=user, otp=otp, type='phone')
-    # Use the send_sms function to send OTP to the new phone number
     send_sms(new_phone, f'Your OTP is: {otp}')
-
     return Response({'message': 'OTP sent to new phone number'})
 
 @api_view(['POST'])
@@ -387,7 +346,6 @@ def update_email(request):
 
     otp = str(randint(100000, 999999))
     OTP.objects.create(user=user, otp=otp, type='email')
-    # Send OTP to new email
     send_mail(
         'Verify your email',
         f'Your OTP is: {otp}',
@@ -395,9 +353,9 @@ def update_email(request):
         [new_email],
         fail_silently=False,
     )
-
     return Response({'message': 'OTP sent to new email'})
 
+# OTP verification for updates
 @api_view(['POST'])
 def verify_update(request):
     user = request.user
@@ -418,13 +376,9 @@ def verify_update(request):
         user.profile.save()
         otp_object.delete()
         return Response({'message': 'Update successful'})
-    else:
-        return Response({'error': 'Invalid or expired OTP'}, status=400)
+    return Response({'error': 'Invalid or expired OTP'}, status=400)
 
-
-
-# Initialize the RemoteStartQueueManager
-
+# Remote charging session management
 @require_POST
 @login_required
 async def remote_start_charge_with_queue(request):
@@ -432,15 +386,11 @@ async def remote_start_charge_with_queue(request):
     connector_id = int(request.POST.get('connectorId'))
     id_tag = request.POST.get('idTag')
 
-    # Add the charging request to the queue
     await remote_start_queue_manager.add_to_queue(request.user, cpid, connector_id, id_tag)
-
-    # Start the next charging session in the queue
     response = await remote_start_queue_manager.start_next_in_queue()
 
     if response.get('status') == 'Accepted':
         return JsonResponse({'message': 'Charging session started'})
     elif response.get('error'):
         return JsonResponse({'error': response.get('error')}, status=500)
-    else:
-        return JsonResponse({'message': 'Added to remote start queue'})
+    return JsonResponse({'message': 'Added to remote start queue'})

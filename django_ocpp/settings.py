@@ -15,6 +15,51 @@ SECRET_KEY = os.getenv('SECRET_KEY')
 MULTITENANT = os.getenv('MULTITENANT', 'False') == 'True'
 DEBUG = os.getenv('DEBUG') == 'True'
 
+
+# Django Payments configuration
+PAYMENTS_PLUGINS = ['payments.stripe', 'payments.razorpay', 'payments.paypal']
+
+# Default Payment Variants, will be updated per tenant
+PAYMENT_VARIANTS = {
+    'stripe': ('payments.stripe.StripeProvider', {
+        'secret_key': os.getenv('STRIPE_SECRET_KEY', ''),
+        'public_key': os.getenv('STRIPE_PUBLIC_KEY', ''),
+    }),
+    'razorpay': ('payments.razorpay.RazorpayProvider', {
+        'key_id': os.getenv('RAZORPAY_KEY_ID', ''),
+        'key_secret': os.getenv('RAZORPAY_KEY_SECRET', ''),
+    }),
+    'paypal': ('payments.paypal.PayPalProvider', {
+        'client_id': os.getenv('PAYPAL_CLIENT_ID', ''),
+        'client_secret': os.getenv('PAYPAL_CLIENT_SECRET', ''),
+    }),
+}
+
+# Dynamic tenant-based payment variants
+def get_payment_variants(tenant):
+    variants = {}
+    
+    if tenant.stripe_secret_key:
+        variants['stripe'] = ('payments.stripe.StripeProvider', {
+            'secret_key': tenant.stripe_secret_key,
+            'public_key': tenant.stripe_public_key,
+        })
+    
+    if tenant.razorpay_key_id:
+        variants['razorpay'] = ('payments.razorpay.RazorpayProvider', {
+            'key_id': tenant.razorpay_key_id,
+            'key_secret': tenant.razorpay_key_secret,
+        })
+    
+    if tenant.paypal_client_id:
+        variants['paypal'] = ('payments.paypal.PayPalProvider', {
+            'client_id': tenant.paypal_client_id,
+            'client_secret': tenant.paypal_client_secret,
+        })
+    
+    return variants
+
+
 # Database settings
 DATABASES = {
     'default': {
@@ -107,6 +152,7 @@ if MULTITENANT:
         'django.contrib.messages',
         'django.contrib.staticfiles',
         'django.contrib.admin',
+
     )
 
     TENANT_APPS = (
@@ -131,6 +177,8 @@ if MULTITENANT:
         'django_filters',
         'django_otp',
         'push_notifications',
+        'payments',
+
         # Other tenant-specific apps
     )
 

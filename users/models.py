@@ -24,6 +24,11 @@ class UserProfile(models.Model):
     is_phone_verified = models.BooleanField(default=False)
     is_email_verified = models.BooleanField(default=False)
 
+    # OCPI specific fields
+    ocpi_party_id = models.CharField(max_length=10, blank=True, null=True)  # Unique party ID
+    ocpi_role = models.CharField(max_length=20, choices=[('CPO', 'CPO'), ('eMSP', 'eMSP')], blank=True, null=True)
+    ocpi_token = models.CharField(max_length=255, blank=True, null=True)  # Store OCPI token here
+
     def __str__(self):
         return self.user.username
 
@@ -66,6 +71,9 @@ class SessionBilling(models.Model):
     kwh_added = models.FloatField()
     kwh_consumed = models.FloatField(blank=True, null=True)
     kwh_refunded = models.FloatField(blank=True, null=True)
+
+    # New field for OCPI CDR
+    cdr_sent = models.BooleanField(default=False)
 
 
 # Charging Plan Model

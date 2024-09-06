@@ -28,6 +28,13 @@ class Charger(models.Model):
     charger_commission_group = models.ForeignKey(PartnerCommissionMemberGroup, on_delete=models.DO_NOTHING, blank=True, null=True,related_name='ocpp_charger_commissions')
     type = models.CharField(max_length=10, default='AC', choices=[('AC', 'AC'), ('DC', 'DC'), ('BOTH', 'BOTH')])
     coordinates = gis_models.PointField(geography=True, blank=True, null=True)
+    name = models.CharField(max_length=255)
+    address = models.CharField(max_length=255)
+
+    # New fields for OCPI compatibility
+    ocpi_id = models.CharField(max_length=50, unique=True, blank=True, null=True)  # OCPI Location ID
+    publish_to_ocpi = models.BooleanField(default=False)  # To mark if this location is shared via OCPI
+
     
     @property
     def online(self):
@@ -78,6 +85,11 @@ class ChargingSession(models.Model):
     limit_type = models.CharField(max_length=10, default='KWH', choices=[('KWH', 'KWH'), ('TIME', 'TIME'), ('SOC', 'SOC'), ('FULL', 'FULL')])
     id_tag = models.ForeignKey('IdTag', on_delete=models.CASCADE, related_name='start_sessions')
     stop_id_tag = models.ForeignKey('IdTag', on_delete=models.SET_NULL, blank=True, null=True, related_name='stop_sessions')
+
+    # New OCPI field
+    auth_method = models.CharField(max_length=50, default='WHITELIST', choices=[('WHITELIST', 'Whitelist'), ('RFID', 'RFID')])
+    ocpi_session_id = models.CharField(max_length=50, unique=True, null=True, blank=True)  # Unique session ID for OCPI
+    ocpi_emsp_id = models.CharField(max_length=10, null=True, blank=True)  # Track which eMSP initiated the session
 
     def save(self, *args, **kwargs):
         if not self.transaction_id:

@@ -4,7 +4,6 @@ from django.utils.timezone import now
 import uuid
 
 
-
 # Partner Commission Member Group Model
 class PartnerCommissionMemberGroup(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
